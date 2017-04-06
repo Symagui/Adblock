@@ -30,11 +30,66 @@ struct host {
 
 int sendToRealServer(struct host *dst, char * data){
 
-  int fd = 100; //File descriptior of new socket with server
+  struct sockaddr_in serv_addr;
 
-  printf("sending to real server and waiting for response...[TODO]\n");
+  int sock = socket(PF_INET, SOCK_STREAM, 0);
 
-  return fd;
+  /*
+   * Remplir la structure serv_addr avec
+  l'adresse du serveur reel
+   */
+  bzero( (char *) &serv_addr,  sizeof(serv_addr) );
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons((ushort)dst->port);
+  serv_addr.sin_addr = dst->ip;
+  if (connect (sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr) ) < 0){
+    perror ("cliecho : erreur connect");
+    exit (1);
+  }
+
+
+  int n;
+  if((n = send(sock, data, sizeof data - 1, 0)) < 0)
+  {
+      perror("sent()");
+      exit(1);
+  }
+
+  char buff[PACKET_SIZE];
+
+  if((n = recv(sock, buff, sizeof buff - 1, 0)) < 0)
+  {
+      perror("recv()");
+      exit(1);
+  }
+
+  printf("received : %s\n",buff);
+
+  /*while(1){
+
+    if((n = recv(sock, buffer, sizeof buffer - 1, 0)) < 0)
+    {
+        perror("recv()");
+        exit(1);
+    }
+
+    printf("server: %s\n", buffer);
+
+    scanf(" %[^\n]s", buffer);
+
+    if((n = send(sock, buffer, sizeof buffer - 1, 0)) < 0)
+    {
+        perror("sent()");
+        exit(1);
+    }
+
+    printf("client: %s\n",buffer);
+
+  }*/
+
+  close(sock);
+
+  return 0;
 
 }
 
@@ -75,20 +130,27 @@ struct host *getHost(char httpHeader[]){
 
   char * host = hostport;
   char * port;
+  int int_port = -1;
   int pos = 0;
   while(hostport[pos]!='\0'){
     if(hostport[pos]==':'){
       hostport[pos] = '\0';
       port = hostport + pos + 1;
+      int_port = 1;
       break;
     }
     pos++;
   }
-  printf("%s %s\n", host, port);
+  if(int_port<0){
+    int_port = 80; //Si on a pas trouvé de port c'est que c'est le port par défaut (80)
+  }else{
+    int_port = atoi(port);
+  }
+  printf("Detected : %s %d\n", host, int_port);
 
   struct hostent ht = *gethostbyname(host);
 
-  h->port = atoi(port);
+  h->port = int_port;
   h->ip = *( struct in_addr*)(ht.h_addr_list[0]);
 
   return h;
@@ -111,14 +173,14 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 
   rcv_buffer[n] = '\0';
 
+  printf("client : %d\n",connectionNum);
+  printf("data : \n" COL_BLUE "%s \n" COL_RESET,rcv_buffer);
+
   //Get host
   struct host *host = getHost(rcv_buffer);
 
-  printf("client : %d\n",connectionNum);
   printf("src : %s:%d\n",inet_ntoa(cli_addr.sin_addr),cli_addr.sin_port);
   printf("dst : %s:%d\n", inet_ntoa( *( struct in_addr*)( &host -> ip)), host->port);
-
-  printf("data : \n" COL_BLUE "%s \n" COL_RESET,rcv_buffer);
 
   //Relaying to real server
   int respfd = sendToRealServer(host, rcv_buffer);
