@@ -129,7 +129,7 @@ struct host *getHost(char httpHeader[]){
   hostport = getValueByKey(httpHeader, "Host: ");
 
   char * host = hostport;
-  char * port;
+  char * port = hostport;
   int int_port = -1;
   int pos = 0;
   while(hostport[pos]!='\0'){
@@ -142,7 +142,7 @@ struct host *getHost(char httpHeader[]){
     pos++;
   }
   if(int_port<0){
-    int_port = 80; //Si on a pas trouvé de port c'est que c'est le port par défaut (80)
+    int_port = 80; //Si on a pas trouvé de port (pas de :) c'est que c'est le port par défaut (80)
   }else{
     int_port = atoi(port);
   }
