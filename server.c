@@ -131,20 +131,12 @@ void fillHeader(struct header *hd, char *src_hd){
 
 void header_ok(int client)
 {
-    char buf[1024];
-
-    snprintf(buf, 1024, "HTTP/1.0 200 OK\r\n");
-    send(client, buf, strlen(buf), 0);
-    snprintf(buf, 1024, "Content-type: text/html\r\n");
-    send(client, buf, strlen(buf), 0);
-    snprintf(buf, 1024, "\r\n");
-    send(client, buf, strlen(buf), 0);
-    snprintf(buf, 1024, "");
+    char buf[1024] = "HTTP/1.0 200 OK\r\n\r\n\0";
     send(client, buf, strlen(buf), 0);
 }
 
 //Function to replace end of file chars by end of string
-repEolByEos(char* line){
+void repEolByEos(char* line){
     int l = strlen(line);
     while (line[l-1] == '\n'||line[l-1] == '\r'){
         line[--l] = '\0';
@@ -180,39 +172,10 @@ int sendToRealServer(struct host *dst, char * data){
 
 }
 
-
-int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_addr){
-
-  //printf("dialogSocket = %d\n", dialogSocket);
-
-  //Get data
-  char rcv_buffer[MAX_SENDER_SIZE];
-  int n = 0;
-
-  if((n = recv(dialogSocket, rcv_buffer, sizeof rcv_buffer - 1, 0)) < 0)
-  {
-      perror("recv()");
-      exit(1);
-  }
-
-  rcv_buffer[n] = '\0';
-
-  //Get host
-  struct header *hd;
-  hd = malloc(sizeof(struct header));
-  fillHeader(hd, rcv_buffer);
-
-  if(hd->ssl==1){
-    header_ok(dialogSocket);
-    printf("closed because https!\n");
-    close(dialogSocket);
-    return 0;
-  }
-
-  //Relaying to real server
-  int respfd = sendToRealServer(&hd->hst, rcv_buffer);
+int httpManager(int dialogSocket, struct header *hd, int respfd){
 
   //Now we receive data
+  int n = 0;
 
   char buff[MAX_RESPONSE_SIZE];
 
@@ -243,6 +206,48 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   }
 
   close(respfd);
+
+  return 0;
+}
+
+
+int httpsManager(int dialogSocket, struct header *fd, int respfd){
+  header_ok(dialogSocket);
+  printf("closed because https!\n");
+  return 0;
+}
+
+
+int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_addr){
+
+  //printf("dialogSocket = %d\n", dialogSocket);
+
+  //Get data
+  char rcv_buffer[MAX_SENDER_SIZE];
+  int n = 0;
+
+  if((n = recv(dialogSocket, rcv_buffer, sizeof rcv_buffer - 1, 0)) < 0)
+  {
+      perror("recv()");
+      exit(1);
+  }
+
+  rcv_buffer[n] = '\0';
+
+  //Get host
+  struct header *hd;
+  hd = malloc(sizeof(struct header));
+  fillHeader(hd, rcv_buffer);
+
+  //Relaying to real server
+  int respfd = sendToRealServer(&hd->hst, rcv_buffer);
+
+  if(hd->ssl==1){
+    httpsManager(dialogSocket, hd, respfd);
+  }else{
+    httpManager(dialogSocket, hd, respfd);
+  }
+
   close(dialogSocket);
 
   return 0;
@@ -307,7 +312,7 @@ int main(int argc, const char* argv[]){
      perror(COL_RED "Fatal : Cannot accept this new client\n");
      exit (1);
     }
-    //printf("New connexion (num %d)\n", connectionId);
+    printf("New connexion (num %d)\n", connectionId);
 
     if(fork()>0){
       connectionId++;
