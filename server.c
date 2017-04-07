@@ -29,6 +29,13 @@ struct host {
   struct in_addr ip;
 };
 
+//Function to replace end of file chars by end of string
+repEolByEos(char* line){
+    int l = strlen(line);
+    while (line[l-1] == '\n'||line[l-1] == '\r'){
+        line[--l] = '\0';
+    }
+}
 int sendToRealServer(struct host *dst, char * data){
 
   struct sockaddr_in serv_addr;
@@ -155,30 +162,31 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   char buff[MAX_RESPONSE_SIZE];
 
   n = 1;
-  while(n>0){
-    if((n = recv(respfd, buff, sizeof buff - 1, 0)) < 0)
-    {
-        perror("recv()");
-        exit(1);
+  FILE* sockrfp = fdopen( respfd, "r" );
+  char line[10000];
+  long contentl = -1;
+  int achar = 0;
+  while (fgets( line, sizeof(line), sockrfp) != (char*) 0){
+    if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 ){
+      //End of header
+      break;
     }
-    printf("recv (%d) : %d\n",connectionNum,n);
-    if((n = send(dialogSocket, buff, sizeof(char)*(n), 0)) < 0)
-    {
-        perror("send()");
-        exit(1);
+    //Send each line of the header to the client
+    send(dialogSocket, line, strlen(line),0);
+    repEolByEos(line);
+    if (strncasecmp(line, "Content-Length:", 15) == 0){
+      contentl = atol(&(line[15]));
     }
   }
-/*
-  printf("resp OK : %d\n", n);
-
-  if((n = send(dialogSocket, buff, sizeof(char)*(n), 0)) < 0)
-  {
-      perror("send()");
-      exit(1);
+  //const char *connection_close = "Connection: close\r\n";
+  //send(dialogSocket, connection_close, strlen(connection_close), 0);
+  send(dialogSocket, line, strlen(line), 0);
+  // Une fois le header envoye, on envoie le reste byte par byte (pour détecter exactement l'EOF)
+  int i;
+  for ( i=0; (contentl == -1||i<contentl)&&(achar=getc(sockrfp))!=EOF; ++i ){
+    send(dialogSocket, &achar, 1, 0);
   }
 
-  printf("sent OK : %d\n", n);
-*/
   close(respfd);
   close(dialogSocket);
 
