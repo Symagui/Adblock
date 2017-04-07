@@ -24,10 +24,124 @@
 #define COL_CYAN    "\x1b[36m"
 #define COL_RESET   "\x1b[0m"
 
+
 struct host {
   int port;
   struct in_addr ip;
 };
+
+struct header {
+  char ssl;
+  char method[500];
+  char path[500];
+  char protocol[500];
+  char hostname[500];
+  struct host hst;
+};
+
+/*
+* Find 'key' and return all chars after it until a \r
+*/
+char * getValueByKey(char httpHeader[], const char *key){
+
+  int keylen = strlen(key);
+
+  int i;
+  int pos = 0;
+  int found = -1;
+  while(httpHeader[pos]!='\0'){
+    if(strncmp(httpHeader+pos, key, keylen) == 0){
+      found = pos+keylen;
+      pos = pos+keylen;
+    }
+    if(found>-1 && httpHeader[pos]=='\r'){
+
+      char *result = malloc(sizeof(char[pos-found+2]));
+
+      for(i=found; i<pos; i++){
+        result[i - found] = httpHeader[i];
+        result[i-found+1] = '\0';
+      }
+
+      return result;
+    }
+    pos++;
+  }
+  return NULL;
+
+}
+
+/*
+* Fill the header struct
+*/
+void fillHeader(struct header *hd, char *src_hd){
+
+    int size = 0;
+    char * currentOffset = src_hd;
+    //get method (first thing)
+    size = strchr(currentOffset,' ') - currentOffset;
+    strncpy(hd->method, currentOffset, size);
+    currentOffset += size + 1;
+
+    //SSL ?
+    hd->ssl = 0;
+    if(strcmp(hd->method, "CONNECT")==0){
+      hd->ssl = 1;
+    }
+
+    //get path+port (in first line)
+    size = strchr(currentOffset,' ') - currentOffset;
+    strncpy(hd->path, currentOffset, size);
+    currentOffset += size + 1;
+
+    //Get protocol, last word of first line
+    size = strchr(currentOffset,'\r') - currentOffset;
+    strncpy(hd->protocol, currentOffset, size);
+    currentOffset += size + 1;
+
+    //Get host and port
+    char * temp_hostport = getValueByKey(currentOffset, "Host: ");
+    char * portpos = strchr(temp_hostport,':');
+    if(portpos == NULL){//No port defined
+      portpos = temp_hostport+strlen(temp_hostport);
+
+      //Set default port
+      hd->hst.port = 80; //DEFAULT TODO : change depending on protocol and method !
+
+    }else{//Port is defined
+      hd->hst.port = atoi(portpos+1);
+    }
+    strncpy(hd->hostname, temp_hostport, portpos-temp_hostport);
+
+    //Get IP from hostname
+    struct hostent ht = *gethostbyname(hd->hostname);
+    hd->hst.ip = *( struct in_addr*)(ht.h_addr_list[0]);
+
+
+    //Show result
+    printf("\nHEADER :\n");
+    printf("  method '%s'\n", hd->method);
+    printf("  path '%s'\n", hd->path);
+    printf("  protocol '%s'\n", hd->protocol);
+    printf("  hostname '%s'\n", hd->hostname);
+    printf("  ip '%s'\n", inet_ntoa( *( struct in_addr*)( &hd->hst.ip)) );
+    printf("  port '%d'\n\n", hd->hst.port);
+
+}
+
+void header_ok(int client)
+{
+    char buf[1024];
+
+    snprintf(buf, 1024, "HTTP/1.0 200 OK\r\n");
+    send(client, buf, strlen(buf), 0);
+    snprintf(buf, 1024, "Content-type: text/html\r\n");
+    send(client, buf, strlen(buf), 0);
+    snprintf(buf, 1024, "\r\n");
+    send(client, buf, strlen(buf), 0);
+    snprintf(buf, 1024, "");
+    send(client, buf, strlen(buf), 0);
+}
 
 //Function to replace end of file chars by end of string
 repEolByEos(char* line){
@@ -66,70 +180,6 @@ int sendToRealServer(struct host *dst, char * data){
 
 }
 
-char * getValueByKey(char httpHeader[], const char *key){
-
-  int keylen = strlen(key);
-
-  int i;
-  int pos = 0;
-  int found = -1;
-  while(httpHeader[pos]!='\0'){
-    if(strncmp(httpHeader+pos, key, keylen) == 0){
-      found = pos+keylen;
-      pos = pos+keylen;
-    }
-    if(found>-1 && httpHeader[pos]=='\r'){
-
-      char *result = malloc(sizeof(char[pos-found+2]));
-
-      for(i=found; i<pos; i++){
-        result[i - found] = httpHeader[i];
-        result[i-found+1] = '\0';
-      }
-
-      return result;
-    }
-    pos++;
-  }
-  return NULL;
-
-}
-
-struct host *getHost(char httpHeader[]){
-
-  struct host *h = malloc(sizeof(struct host));
-
-  char * hostport;
-  hostport = getValueByKey(httpHeader, "Host: ");
-
-  char * host = hostport;
-  char * port = hostport;
-  int int_port = -1;
-  int pos = 0;
-  while(hostport[pos]!='\0'){
-    if(hostport[pos]==':'){
-      hostport[pos] = '\0';
-      port = hostport + pos + 1;
-      int_port = 1;
-      break;
-    }
-    pos++;
-  }
-  if(int_port<0){
-    int_port = 80; //Si on a pas trouvé de port (pas de :) c'est que c'est le port par défaut (80)
-  }else{
-    int_port = atoi(port);
-  }
-  printf("Detected : %s %d\n", host, int_port);
-
-  struct hostent ht = *gethostbyname(host);
-
-  h->port = int_port;
-  h->ip = *( struct in_addr*)(ht.h_addr_list[0]);
-
-  return h;
-
-}
 
 int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_addr){
 
@@ -147,17 +197,22 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 
   rcv_buffer[n] = '\0';
 
-  printf("client : %d\n",connectionNum);
-  printf("data : \n" COL_BLUE "%s \n" COL_RESET,rcv_buffer);
-
   //Get host
-  struct host *host = getHost(rcv_buffer);
+  struct header *hd;
+  hd = malloc(sizeof(struct header));
+  fillHeader(hd, rcv_buffer);
 
-  printf("src : %s:%d\n",inet_ntoa(cli_addr.sin_addr),cli_addr.sin_port);
-  printf("dst : %s:%d\n", inet_ntoa( *( struct in_addr*)( &host -> ip)), host->port);
+  if(hd->ssl==1){
+    header_ok(dialogSocket);
+    printf("closed because https!\n");
+    close(dialogSocket);
+    return 0;
+  }
 
   //Relaying to real server
-  int respfd = sendToRealServer(host, rcv_buffer);
+  int respfd = sendToRealServer(&hd->hst, rcv_buffer);
+
+  //Now we receive data
 
   char buff[MAX_RESPONSE_SIZE];
 
