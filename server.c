@@ -97,6 +97,7 @@ char * getValueByKey(char httpHeader[], const char *key){
 
   int keylen = strlen(key);
 
+  int i;
   int pos = 0;
   int found = -1;
   while(httpHeader[pos]!='\0'){
@@ -108,7 +109,7 @@ char * getValueByKey(char httpHeader[], const char *key){
 
       char *result = malloc(sizeof(char[found-pos+1]));
 
-      for(int i=found; i<pos; i++){
+      for(i=found; i<pos; i++){
         result[i - found] = httpHeader[i];
         result[i-found+1] = '\0';
       }
