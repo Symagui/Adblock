@@ -54,6 +54,7 @@ int sendToRealServer(struct host *dst, char * data){
       perror("sent()");
       exit(1);
   }
+  printf("msg sent !\n",buff);
 
   char buff[PACKET_SIZE];
 
@@ -105,9 +106,9 @@ char * getValueByKey(char httpHeader[], const char *key){
       found = pos+keylen;
       pos = pos+keylen;
     }
-    if(found>-1 && httpHeader[pos]=='\n'){
+    if(found>-1 && httpHeader[pos]=='\r'){
 
-      char *result = malloc(sizeof(char[found-pos+1]));
+      char *result = malloc(sizeof(char[found-pos+2]));
 
       for(i=found; i<pos; i++){
         result[i - found] = httpHeader[i];
@@ -214,6 +215,8 @@ int main(int argc, const char* argv[]){
   serv_addr.sin_family = AF_INET ;
   serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
   serv_addr.sin_port = htons(PROXY_PORT);
+  int ttl = 1;
+  setsockopt(serverSocket, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
   if (bind(serverSocket,(struct sockaddr *)&serv_addr, sizeof(serv_addr) ) <0) {
     perror (COL_RED "Bind error");
     exit (1);
