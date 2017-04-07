@@ -12,7 +12,8 @@
 #include <regex.h>
 
 #define PROXY_PORT 80
-#define PACKET_SIZE 4096
+#define MAX_RESPONSE_SIZE 4096
+#define MAX_SENDER_SIZE 4096
 
 //Colors
 #define COL_RED     "\x1b[31m"
@@ -72,7 +73,7 @@ char * getValueByKey(char httpHeader[], const char *key){
     }
     if(found>-1 && httpHeader[pos]=='\r'){
 
-      char *result = malloc(sizeof(char[found-pos+2]));
+      char *result = malloc(sizeof(char[pos-found+2]));
 
       for(i=found; i<pos; i++){
         result[i - found] = httpHeader[i];
@@ -128,7 +129,7 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   printf("dialogSocket = %d\n", dialogSocket);
 
   //Get data
-  char rcv_buffer[PACKET_SIZE];
+  char rcv_buffer[MAX_SENDER_SIZE];
   int n = 0;
 
   if((n = recv(dialogSocket, rcv_buffer, sizeof rcv_buffer - 1, 0)) < 0)
@@ -151,21 +152,35 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   //Relaying to real server
   int respfd = sendToRealServer(host, rcv_buffer);
 
-  char buff[PACKET_SIZE];
+  char buff[MAX_RESPONSE_SIZE];
 
-  if((n = recv(respfd, buff, sizeof buff - 1, 0)) < 0)
-  {
-      perror("recv()");
-      exit(1);
+  n = 1;
+  while(n>0){
+    if((n = recv(respfd, buff, sizeof buff - 1, 0)) < 0)
+    {
+        perror("recv()");
+        exit(1);
+    }
+    printf("recv (%d) : %d\n",connectionNum,n);
+    if((n = send(dialogSocket, buff, sizeof(char)*(n), 0)) < 0)
+    {
+        perror("send()");
+        exit(1);
+    }
   }
+/*
+  printf("resp OK : %d\n", n);
 
-  printf("resp OK\n");
-
-  if((n = send(dialogSocket, buff, sizeof buff - 1, 0)) < 0)
+  if((n = send(dialogSocket, buff, sizeof(char)*(n), 0)) < 0)
   {
       perror("send()");
       exit(1);
   }
+
+  printf("sent OK : %d\n", n);
+*/
+  close(respfd);
+  close(dialogSocket);
 
   return 0;
 }
@@ -197,6 +212,7 @@ int main(int argc, const char* argv[]){
   serv_addr.sin_port = htons(PROXY_PORT);
   int ttl = 1;
   setsockopt(serverSocket, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
+  setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
   if (bind(serverSocket,(struct sockaddr *)&serv_addr, sizeof(serv_addr) ) <0) {
     perror (COL_RED "Bind error");
     exit (1);
@@ -241,5 +257,7 @@ int main(int argc, const char* argv[]){
 
   close(dialogSocket);
   close(serverSocket);
+
+  return 0;
 
 }
