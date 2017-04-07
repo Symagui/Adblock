@@ -213,7 +213,10 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
   if (dialogSocket > respfd) maxfdp = dialogSocket + 1; //Just in case
   int err;
   //int i = 1;
-
+  // Timeout de 4 secondes
+  struct timeval timeout;
+  timeout.tv_sec = 4;
+  timeout.tv_usec = 0;
   //Send OK to the browser for ssl connection
   const char *connection_established = "HTTP/1.0 200 Connection established\r\n\r\n";
   send(dialogSocket, connection_established, strlen(connection_established), 0);
@@ -225,10 +228,16 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
     FD_ZERO(&fdset);
     FD_SET(dialogSocket, &fdset);
     FD_SET(respfd, &fdset);
-    err = select(maxfdp, &fdset, NULL, NULL, NULL); //TODO set a timeout
-    if (err <= 0){
+    err = select(maxfdp, &fdset, NULL, NULL, &timeout); //TODO set a timeout
+    if (err < 0){
       printf(COL_RED "ERROR with select on https connection\n" COL_RESET);
       exit(1);
+    }
+    if (err == 0){
+      printf(COL_YELLOW "WARNING connection timeout\n" COL_RESET);
+      const char *connection_timeout = "HTTP/1.0 499 Connection timeout\r\n\r\n";
+      send(dialogSocket, connection_timeout, strlen(connection_timeout), 0);
+      break;
     }
 
     if (FD_ISSET(dialogSocket, &fdset)){
