@@ -47,50 +47,14 @@ int sendToRealServer(struct host *dst, char * data){
     exit (1);
   }
 
-
   int n;
-  if((n = send(sock, data, sizeof data - 1, 0)) < 0)
+  if((n = send(sock, data, strlen(data), 0)) < 0)
   {
       perror("sent()");
       exit(1);
   }
-  printf("msg sent !\n");
 
-  char buff[PACKET_SIZE];
-
-  if((n = recv(sock, buff, sizeof buff - 1, 0)) < 0)
-  {
-      perror("recv()");
-      exit(1);
-  }
-
-  printf("received : %s\n",buff);
-
-  /*while(1){
-
-    if((n = recv(sock, buffer, sizeof buffer - 1, 0)) < 0)
-    {
-        perror("recv()");
-        exit(1);
-    }
-
-    printf("server: %s\n", buffer);
-
-    scanf(" %[^\n]s", buffer);
-
-    if((n = send(sock, buffer, sizeof buffer - 1, 0)) < 0)
-    {
-        perror("sent()");
-        exit(1);
-    }
-
-    printf("client: %s\n",buffer);
-
-  }*/
-
-  close(sock);
-
-  return 0;
+  return sock;
 
 }
 
@@ -186,6 +150,22 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 
   //Relaying to real server
   int respfd = sendToRealServer(host, rcv_buffer);
+
+  char buff[PACKET_SIZE];
+
+  if((n = recv(respfd, buff, sizeof buff - 1, 0)) < 0)
+  {
+      perror("recv()");
+      exit(1);
+  }
+
+  printf("resp OK\n");
+
+  if((n = send(dialogSocket, buff, sizeof buff - 1, 0)) < 0)
+  {
+      perror("send()");
+      exit(1);
+  }
 
   return 0;
 }
