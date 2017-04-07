@@ -119,13 +119,13 @@ void fillHeader(struct header *hd, char *src_hd){
 
 
     //Show result
-    printf("\nHEADER :\n");
-    printf("  method '%s'\n", hd->method);
+    //printf("\nHEADER :\n");
+    //printf("  method '%s'\n", hd->method);
     printf("  path '%s'\n", hd->path);
-    printf("  protocol '%s'\n", hd->protocol);
-    printf("  hostname '%s'\n", hd->hostname);
-    printf("  ip '%s'\n", inet_ntoa( *( struct in_addr*)( &hd->hst.ip)) );
-    printf("  port '%d'\n\n", hd->hst.port);
+    //printf("  protocol '%s'\n", hd->protocol);
+    //printf("  hostname '%s'\n", hd->hostname);
+    //printf("  ip '%s'\n", inet_ntoa( *( struct in_addr*)( &hd->hst.ip)) );
+    //printf("  port '%d'\n\n", hd->hst.port);
 
 }
 
@@ -183,7 +183,7 @@ int sendToRealServer(struct host *dst, char * data){
 
 int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_addr){
 
-  printf("dialogSocket = %d\n", dialogSocket);
+  //printf("dialogSocket = %d\n", dialogSocket);
 
   //Get data
   char rcv_buffer[MAX_SENDER_SIZE];
@@ -307,10 +307,11 @@ int main(int argc, const char* argv[]){
      perror(COL_RED "Fatal : Cannot accept this new client\n");
      exit (1);
     }
-    printf("New connexion (num %d)\n", connectionId);
+    //printf("New connexion (num %d)\n", connectionId);
 
-    if(fork()){
+    if(fork()>0){
       connectionId++;
+      close(dialogSocket);
     }else{
       ClientManager(connectionId, dialogSocket, cli_addr);
       break;
@@ -318,7 +319,6 @@ int main(int argc, const char* argv[]){
 
   }
 
-  close(dialogSocket);
   close(serverSocket);
 
   return 0;
