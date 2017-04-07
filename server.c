@@ -107,6 +107,9 @@ void fillHeader(struct header *hd, char *src_hd){
 
       //Set default port
       hd->hst.port = 80; //DEFAULT TODO : change depending on protocol and method !
+      if (hd->ssl){
+        hd->hst.port= 443; //DEFAULT SSL
+      }
 
     }else{//Port is defined
       hd->hst.port = atoi(portpos+1);
@@ -180,11 +183,11 @@ int httpManager(int dialogSocket, struct header *hd, int respfd){
   char buff[MAX_RESPONSE_SIZE];
 
   n = 1;
-  FILE* sockrfp = fdopen( respfd, "r" );
+  FILE* socketfp = fdopen( respfd, "r" );
   char line[10000];
   long contentl = -1;
   int achar = 0;
-  while (fgets( line, sizeof(line), sockrfp) != (char*) 0){
+  while (fgets( line, sizeof(line), socketfp) != (char*) 0){
     if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 ){
       //End of header
       break;
@@ -201,7 +204,7 @@ int httpManager(int dialogSocket, struct header *hd, int respfd){
   send(dialogSocket, line, strlen(line), 0);
   // Une fois le header envoye, on envoie le reste byte par byte (pour détecter exactement l'EOF)
   int i;
-  for ( i=0; (contentl == -1||i<contentl)&&(achar=getc(sockrfp))!=EOF; ++i ){
+  for ( i=0; (contentl == -1||i<contentl)&&(achar=getc(socketfp))!=EOF; ++i ){
     send(dialogSocket, &achar, 1, 0);
   }
 
@@ -212,8 +215,55 @@ int httpManager(int dialogSocket, struct header *hd, int respfd){
 
 
 int httpsManager(int dialogSocket, struct header *fd, int respfd){
-  header_ok(dialogSocket);
-  printf("closed because https!\n");
+  char buf[10000];
+  fd_set fdset;
+  int maxfdp = respfd+1;  //Most likely
+  if (dialogSocket > respfd) maxfdp = dialogSocket + 1; //Just in case
+  int err;
+  int i = 1;
+  // On crée une connexion entre le client et le serveur dans le cas du ssl (on sert juste de tunnel)
+  // Sauf si l'addresse fait partie des filtrées
+  for(;;){
+    printf("message number %d for this ssl connection\n", i++);
+    FD_ZERO(&fdset);
+    FD_SET(dialogSocket, &fdset);
+    FD_SET(respfd, &fdset);
+    err = select(maxfdp, &fdset, NULL, NULL, NULL); //TODO set a timeout
+    if (err <= 0){
+      printf("ERROR with select on https connection\n");
+      exit(1);
+    } 
+    
+    if (FD_ISSET(dialogSocket, &fdset)){
+      // the client has send something, we must relay (err = 0 means end of connection)
+      err = read(dialogSocket, buf, sizeof(buf));
+      if (err <= 0){
+        printf("end of connection client side 1\n");
+        break;
+      }
+      err = write(respfd, buf, err);
+      if (err <= 0){
+        printf("end of connection server side 1\n");
+        break;
+      }
+    } else if (FD_ISSET(respfd, &fdset)){
+      //The server has sent something, we must relay (err = 0 means end of connection)
+      err = read(respfd, buf, sizeof(buf));
+      printf("%s\n",buf);
+      if (err <= 0){
+        printf("end of connection server side 2\n");
+        break;
+      }
+      err = write(dialogSocket, buf, err);
+      if (err <= 0){
+        printf("end of connection client side 2\n");
+        break;
+      }
+    }
+    //break;
+  }
+  //header_ok(dialogSocket);
+  //printf("closed because https!\n");
   return 0;
 }
 
