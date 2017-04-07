@@ -27,7 +27,8 @@
 
 struct host {
   int port;
-  struct in_addr ip;
+  char *sport;
+  struct addrinfo *addr;
 };
 
 struct header {
@@ -75,7 +76,7 @@ char * getValueByKey(char httpHeader[], const char *key){
 */
 
 int isAd(struct header *hd){
-  //TODO Faire le filtre
+
   return 0;
 }
 
@@ -120,22 +121,31 @@ void fillHeader(struct header *hd, char *src_hd){
       portpos = temp_hostport+strlen(temp_hostport);
 
       //Set default port
-      hd->hst.port = 80; //DEFAULT TODO : change depending on protocol and method !
+      hd->hst.sport = "80"; //DEFAULT TODO : change depending on protocol and method !
       if (hd->ssl){
-        hd->hst.port= 443; //DEFAULT SSL
+        hd->hst.sport= "443"; //DEFAULT SSL
       }
 
     }else{//Port is defined
-      hd->hst.port = atoi(portpos+1);
+      hd->hst.sport = portpos+1;
     }
+    hd->hst.port= atoi(hd->hst.sport); //int version
     strncpy(hd->hostname, temp_hostport, portpos-temp_hostport);
 
     free(temp_hostport);
 
     //Get IP from hostname
-    struct hostent ht = *gethostbyname(hd->hostname);
-    hd->hst.ip = *( struct in_addr*)(ht.h_addr_list[0]);
-
+    struct addrinfo hints;
+    struct addrinfo *result;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* TCP for HTTP server */
+    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+    hints.ai_protocol = 0;          /* Any protocol */
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+    getaddrinfo(hd->hostname,hd->hst.sport, &hints, &hd->hst.addr);
 
     //Show result
     //printf("\nHEADER :\n");
@@ -143,7 +153,7 @@ void fillHeader(struct header *hd, char *src_hd){
     //printf("  path '%s'\n", hd->path);
     //printf("  protocol '%s'\n", hd->protocol);
     //printf("  hostname '%s'\n", hd->hostname);
-    //printf("  ip '%s'\n", inet_ntoa( *( struct in_addr*)( &hd->hst.ip)) );
+    //printf("  ip '%s'\n", inet_ntoa(*((struct in_addr*)(hd->hst.addr->ai_addr))));
     //printf("  port '%d'\n\n", hd->hst.port);
 
 }
@@ -163,18 +173,30 @@ void repEolByEos(char* line){
 }
 int getRealServer(struct host *dst){
 
-  struct sockaddr_in serv_addr;
 
-  int sock = socket(PF_INET, SOCK_STREAM, 0);
+  int sock = socket(AF_INET, SOCK_STREAM, 0);
 
-  bzero( (char *) &serv_addr,  sizeof(serv_addr) );
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons((ushort)dst->port);
-  serv_addr.sin_addr = dst->ip;
-  if (connect (sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr) ) < 0){
-    perror ("cliecho : erreur connect");
-    exit (1);
+  int len=20;
+  char buffer[len];
+
+  struct addrinfo *addr = dst->addr;
+  while ( connect (sock, ((struct in_addr*)(addr->ai_addr)), sizeof(struct sockaddr) ) < 0){
+
+      if(addr->ai_addr->sa_family != AF_INET){
+        sock = socket(AF_INET6, SOCK_STREAM, 0);
+        if(connect (sock, ((struct sockaddr*)(addr->ai_addr)), sizeof(struct sockaddr) ) >=0){
+          break;//TODO invalid argument ? Why ?
+        }
+      }
+
+      addr = addr->ai_next;
+      if(addr==NULL){
+        perror("Erreur pas d'ip valide");
+        exit(0);
+        break;
+      }
   }
+
 
   return sock;
 
@@ -297,11 +319,12 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   }
 
   rcv_buffer[n] = '\0';
-  
+
   //Get host
   struct header *hd;
   hd = malloc(sizeof(struct header));
   fillHeader(hd, rcv_buffer);
+
   if (isAd(hd)){
     printf("> (INVALID) %s\n", hd->path);
     header_ok(dialogSocket);
