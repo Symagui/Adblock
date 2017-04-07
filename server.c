@@ -70,6 +70,15 @@ char * getValueByKey(char httpHeader[], const char *key){
   return NULL;
 
 }
+/*
+* Filter ads (return 1 if request an ad)
+*/
+
+int isAd(struct header *hd){
+  //TODO Faire le filtre
+  return 0;
+}
+
 
 /*
 * Fill the header struct
@@ -288,13 +297,19 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   }
 
   rcv_buffer[n] = '\0';
-
+  
   //Get host
   struct header *hd;
   hd = malloc(sizeof(struct header));
   fillHeader(hd, rcv_buffer);
-
-  printf("> (VALID) %s\n", hd->path);
+  if (isAd(hd)){
+    printf("> (INVALID) %s\n", hd->path);
+    header_ok(dialogSocket);
+    close(dialogSocket);
+    return 0;
+  } else {
+    printf("> (VALID) %s\n", hd->path);
+  }
 
   //Relaying to real server
   int respfd = getRealServer(&hd->hst);
