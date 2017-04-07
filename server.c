@@ -54,7 +54,7 @@ int sendToRealServer(struct host *dst, char * data){
       perror("sent()");
       exit(1);
   }
-  printf("msg sent !\n",buff);
+  printf("msg sent !\n");
 
   char buff[PACKET_SIZE];
 
