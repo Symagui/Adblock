@@ -76,8 +76,6 @@ char * getValueByKey(char httpHeader[], const char *key){
 */
 void fillHeader(struct header *hd, char *src_hd){
 
-    printf("|");
-    fflush(stdout);
 
     int size = 0;
     char * currentOffset = src_hd;
@@ -86,8 +84,6 @@ void fillHeader(struct header *hd, char *src_hd){
     strncpy(hd->method, currentOffset, size);
     currentOffset += size + 1;
 
-    printf("|");
-    fflush(stdout);
 
     //SSL ?
     hd->ssl = 0;
@@ -95,24 +91,18 @@ void fillHeader(struct header *hd, char *src_hd){
       hd->ssl = 1;
     }
 
-    printf("|");
-    fflush(stdout);
 
     //get path+port (in first line)
     size = strchr(currentOffset,' ') - currentOffset;
     strncpy(hd->path, currentOffset, size);
     currentOffset += size + 1;
 
-    printf("|");
-    fflush(stdout);
 
     //Get protocol, last word of first line
     size = strchr(currentOffset,'\r') - currentOffset;
     strncpy(hd->protocol, currentOffset, size);
     currentOffset += size + 1;
 
-    printf("|");
-    fflush(stdout);
 
     //Get host and port
     char * temp_hostport = getValueByKey(currentOffset, "Host: ");
@@ -134,9 +124,7 @@ void fillHeader(struct header *hd, char *src_hd){
     free(temp_hostport);
 
     //Get IP from hostname
-    printf("%d======>%s\n", hd->hostname);
     struct hostent ht = *gethostbyname(hd->hostname);
-    printf("=============\n");
     hd->hst.ip = *( struct in_addr*)(ht.h_addr_list[0]);
 
 
@@ -170,10 +158,6 @@ int getRealServer(struct host *dst){
 
   int sock = socket(PF_INET, SOCK_STREAM, 0);
 
-  /*
-   * Remplir la structure serv_addr avec
-  l'adresse du serveur reel
-   */
   bzero( (char *) &serv_addr,  sizeof(serv_addr) );
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_port = htons((ushort)dst->port);
@@ -190,11 +174,7 @@ int getRealServer(struct host *dst){
 int httpManager(int dialogSocket, struct header *hd, int respfd){
 
   //Now we receive data
-  int n = 0;
 
-  char buff[MAX_RESPONSE_SIZE];
-
-  n = 1;
   FILE* socketfp = fdopen( respfd, "r" );
   char line[10000];
   long contentl = -1;
@@ -232,51 +212,47 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
   int maxfdp = respfd+1;  //Most likely
   if (dialogSocket > respfd) maxfdp = dialogSocket + 1; //Just in case
   int err;
-  int i = 1;
+  //int i = 1;
 
+  //Send OK to the browser for ssl connection
   const char *connection_established = "HTTP/1.0 200 Connection established\r\n\r\n";
-  /* Return SSL-proxy greeting header. */
   send(dialogSocket, connection_established, strlen(connection_established), 0);
 
   // On crée une connexion entre le client et le serveur dans le cas du ssl (on sert juste de tunnel)
   // Sauf si l'addresse fait partie des filtrées
   for(;;){
-    printf("message number %d for this ssl connection\n", i++);
+    //printf("message number %d for this ssl connection\n", i++);
     FD_ZERO(&fdset);
     FD_SET(dialogSocket, &fdset);
     FD_SET(respfd, &fdset);
     err = select(maxfdp, &fdset, NULL, NULL, NULL); //TODO set a timeout
     if (err <= 0){
-      printf("ERROR with select on https connection\n");
+      printf(COL_RED "ERROR with select on https connection\n" COL_RESET);
       exit(1);
     }
 
     if (FD_ISSET(dialogSocket, &fdset)){
-      printf("===>SEND\n", i++);
       // the client has send something, we must relay (err = 0 means end of connection)
       err = read(dialogSocket, buf, sizeof(buf));
       if (err <= 0){
-        printf("end of connection client side 1\n");
+        //printf("end of connection client side 1\n");
         break;
       }
       err = write(respfd, buf, err);
       if (err <= 0){
-        printf("end of connection server side 1\n");
+        //printf("end of connection server side 1\n");
         break;
       }
     } else if (FD_ISSET(respfd, &fdset)){
-      printf("===>ReCV\n", i++);
-
       //The server has sent something, we must relay (err = 0 means end of connection)
       err = read(respfd, buf, sizeof(buf));
-      printf("%s\n",buf);
       if (err <= 0){
-        printf("end of connection server side 2\n");
+        //printf("end of connection server side 2\n");
         break;
       }
       err = write(dialogSocket, buf, err);
       if (err <= 0){
-        printf("end of connection client side 2\n");
+        //printf("end of connection client side 2\n");
         break;
       }
     }
@@ -302,8 +278,6 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
       exit(1);
   }
 
-  printf("|");
-
   rcv_buffer[n] = '\0';
 
   //Get host
@@ -311,7 +285,7 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   hd = malloc(sizeof(struct header));
   fillHeader(hd, rcv_buffer);
 
-  printf("| %s\n", hd->path);
+  printf("> (VALID) %s\n", hd->path);
 
   //Relaying to real server
   int respfd = getRealServer(&hd->hst);
@@ -340,7 +314,6 @@ int main(int argc, const char* argv[]){
 
   int serverSocket ;
   struct sockaddr_in serv_addr;
-  socklen_t optlen ;
 
   if ( (serverSocket=socket(PF_INET, SOCK_STREAM,0)) <0){
     perror(COL_RED "Socket error"); exit(1) ;
@@ -393,7 +366,6 @@ int main(int argc, const char* argv[]){
       connectionId++;
       close(dialogSocket);
     }else{
-      printf("New connexion (num %d) -> ", connectionId);
       ClientManager(connectionId, dialogSocket, cli_addr);
       break;
     }
