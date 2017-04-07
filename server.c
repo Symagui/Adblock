@@ -76,6 +76,9 @@ char * getValueByKey(char httpHeader[], const char *key){
 */
 void fillHeader(struct header *hd, char *src_hd){
 
+    printf("|");
+    fflush(stdout);
+
     int size = 0;
     char * currentOffset = src_hd;
     //get method (first thing)
@@ -83,21 +86,33 @@ void fillHeader(struct header *hd, char *src_hd){
     strncpy(hd->method, currentOffset, size);
     currentOffset += size + 1;
 
+    printf("|");
+    fflush(stdout);
+
     //SSL ?
     hd->ssl = 0;
     if(strcmp(hd->method, "CONNECT")==0){
       hd->ssl = 1;
     }
 
+    printf("|");
+    fflush(stdout);
+
     //get path+port (in first line)
     size = strchr(currentOffset,' ') - currentOffset;
     strncpy(hd->path, currentOffset, size);
     currentOffset += size + 1;
 
+    printf("|");
+    fflush(stdout);
+
     //Get protocol, last word of first line
     size = strchr(currentOffset,'\r') - currentOffset;
     strncpy(hd->protocol, currentOffset, size);
     currentOffset += size + 1;
+
+    printf("|");
+    fflush(stdout);
 
     //Get host and port
     char * temp_hostport = getValueByKey(currentOffset, "Host: ");
@@ -116,15 +131,19 @@ void fillHeader(struct header *hd, char *src_hd){
     }
     strncpy(hd->hostname, temp_hostport, portpos-temp_hostport);
 
+    free(temp_hostport);
+
     //Get IP from hostname
+    printf("%d======>%s\n", hd->hostname);
     struct hostent ht = *gethostbyname(hd->hostname);
+    printf("=============\n");
     hd->hst.ip = *( struct in_addr*)(ht.h_addr_list[0]);
 
 
     //Show result
     //printf("\nHEADER :\n");
     //printf("  method '%s'\n", hd->method);
-    printf("  path '%s'\n", hd->path);
+    //printf("  path '%s'\n", hd->path);
     //printf("  protocol '%s'\n", hd->protocol);
     //printf("  hostname '%s'\n", hd->hostname);
     //printf("  ip '%s'\n", inet_ntoa( *( struct in_addr*)( &hd->hst.ip)) );
@@ -145,7 +164,7 @@ void repEolByEos(char* line){
         line[--l] = '\0';
     }
 }
-int sendToRealServer(struct host *dst, char * data){
+int getRealServer(struct host *dst){
 
   struct sockaddr_in serv_addr;
 
@@ -162,13 +181,6 @@ int sendToRealServer(struct host *dst, char * data){
   if (connect (sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr) ) < 0){
     perror ("cliecho : erreur connect");
     exit (1);
-  }
-
-  int n;
-  if((n = send(sock, data, strlen(data), 0)) < 0)
-  {
-      perror("sent()");
-      exit(1);
   }
 
   return sock;
@@ -221,6 +233,11 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
   if (dialogSocket > respfd) maxfdp = dialogSocket + 1; //Just in case
   int err;
   int i = 1;
+
+  const char *connection_established = "HTTP/1.0 200 Connection established\r\n\r\n";
+  /* Return SSL-proxy greeting header. */
+  send(dialogSocket, connection_established, strlen(connection_established), 0);
+
   // On crée une connexion entre le client et le serveur dans le cas du ssl (on sert juste de tunnel)
   // Sauf si l'addresse fait partie des filtrées
   for(;;){
@@ -232,9 +249,10 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
     if (err <= 0){
       printf("ERROR with select on https connection\n");
       exit(1);
-    } 
-    
+    }
+
     if (FD_ISSET(dialogSocket, &fdset)){
+      printf("===>SEND\n", i++);
       // the client has send something, we must relay (err = 0 means end of connection)
       err = read(dialogSocket, buf, sizeof(buf));
       if (err <= 0){
@@ -247,6 +265,8 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
         break;
       }
     } else if (FD_ISSET(respfd, &fdset)){
+      printf("===>ReCV\n", i++);
+
       //The server has sent something, we must relay (err = 0 means end of connection)
       err = read(respfd, buf, sizeof(buf));
       printf("%s\n",buf);
@@ -282,6 +302,8 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
       exit(1);
   }
 
+  printf("|");
+
   rcv_buffer[n] = '\0';
 
   //Get host
@@ -289,15 +311,19 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   hd = malloc(sizeof(struct header));
   fillHeader(hd, rcv_buffer);
 
+  printf("| %s\n", hd->path);
+
   //Relaying to real server
-  int respfd = sendToRealServer(&hd->hst, rcv_buffer);
+  int respfd = getRealServer(&hd->hst);
 
   if(hd->ssl==1){
     httpsManager(dialogSocket, hd, respfd);
   }else{
+    send(respfd, rcv_buffer, strlen(rcv_buffer), 0);
     httpManager(dialogSocket, hd, respfd);
   }
 
+  free(hd);
   close(dialogSocket);
 
   return 0;
@@ -362,12 +388,12 @@ int main(int argc, const char* argv[]){
      perror(COL_RED "Fatal : Cannot accept this new client\n");
      exit (1);
     }
-    printf("New connexion (num %d)\n", connectionId);
 
     if(fork()>0){
       connectionId++;
       close(dialogSocket);
     }else{
+      printf("New connexion (num %d) -> ", connectionId);
       ClientManager(connectionId, dialogSocket, cli_addr);
       break;
     }
