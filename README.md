@@ -13,7 +13,7 @@ This proxy has been made by Romaric Mollard and Guillaume Ruchot in April 2017.
 Just *make* the sources then enter *./proxy -h*
 
 ### help
-
+```
 SYNOPSIS
 		(sudo) ./proxy [OPTION]... [FICHIER FILTRE, FICHIER FILTRE, ...]
 OPTIONS
@@ -24,3 +24,4 @@ OPTIONS
 EXEMPLE
 		sudo ./proxy -p 400 mask.txt
     Démarre un proxy sur le port 400 en utilisant les filtres du fichier mask.txt
+```
