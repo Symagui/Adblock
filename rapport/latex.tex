@@ -194,16 +194,29 @@ Une bonne partie de cette liste concerne des éléments du contenu HTML d'un sit
 \chapter{Partie II - Création de l'outil}
 
 \section{Fonctionnement général du programme}
+Le programme fonctionne en N parties.
+
+\subsection{Démarrage du serveur principal d'écoute des clients}
+
+\subsection{Lecture du header}
+
+\subsection{Filtrage}
+
+\subsection{Envoi des données en HTTP}
+
+\subsection{Envoi des données en SSL}
+
+\subsection{Divers}
 
 \section{Difficultés rencontrées}
 
 \subsection{Détection de la fin des transmissions}
 Dans un premier temps, nous nous attendions simplement à recevoir un message vide pour indiquer la fin des données transmises, cependant ce ne fut pas le cas, et bien que la page fut chargée entièrement, le navigateur continuait d'attendre la fin du chargement.\\
-[GUILLAUME]
+GUILAUME!
 
 \subsection{Plusieurs paquets du navigateur}
 Nous pensions à tort que l'entête HTTP était envoyée dans un seul paquet. Nous analysions et relayions ce paquet sans nous poser plus de questions. Cependant en allant sur le site de publicité http://01.net, nous avons très vite remarqué que les fervants utilisateurs de Cookies envoyaient de très lourds paquets aux serveurs.\\
-Et contre-intuitivement, il ne fallait pas récupérer l'ensemble des données et tenter de tout envoyer au serveur. Il fallait effectuer toute la procédure d'envoi pour chaque paquet, car il semblerait que quand le paquet est trop long, le navigateur recréé une entête HTTP contenant la méthode spéciale 
+Nous avons donc édité le code pour envoyer chaque morceaux comme nous le faisons dans l'autre sens pour la réception des pages web.
 
 \subsection{Préparation à l'IPv6}
 Dans un premier temps, nous avons utilisé gethostbyname(1) pour obtenir une adresse IPv4 correspondant à un nom de domaine. Cependant il fallait prendre en compte l'utilisation des adresses IPv6 qui commencent à être de plus en plus utilisées sur Internet.\\

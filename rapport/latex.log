@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.17 (TeX Live 2016) (preloaded format=pdflatex 2016.9.30)  8 APR 2017 17:26
+This is pdfTeX, Version 3.14159265-2.6-1.40.17 (TeX Live 2016) (preloaded format=pdflatex 2016.9.30)  8 APR 2017 18:07
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -771,13 +771,13 @@ LaTeX Info: Redefining \nameref on input line 57.
 * \@reversemarginfalse
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
-<images/tn.png, id=88, 281.05pt x 138.5175pt>
+<images/tn.png, id=124, 281.05pt x 138.5175pt>
 File: images/tn.png Graphic file (type png)
  <use images/tn.png>
 Package pdftex.def Info: images/tn.png used on input line 62.
 (pdftex.def)             Requested size: 103.91396pt x 51.21504pt.
 
-<images/ul.png, id=90, 255.95625pt x 91.34125pt>
+<images/ul.png, id=126, 255.95625pt x 91.34125pt>
 File: images/ul.png Graphic file (type png)
  <use images/ul.png>
 Package pdftex.def Info: images/ul.png used on input line 64.
@@ -861,7 +861,7 @@ l.113 \chapter
 
 ]
 chapter 2.
-<images/f1.png, id=132, 1083.04625pt x 923.45pt>
+<images/f1.png, id=178, 1083.04625pt x 923.45pt>
 File: images/f1.png Graphic file (type png)
  <use images/f1.png>
 Package pdftex.def Info: images/f1.png used on input line 127.
@@ -893,7 +893,7 @@ been already used, duplicate ignored
 l.143 
        [2
 
- <./images/f1.png>] <images/f2.png, id=137, 1397.22pt x 888.31876pt>
+ <./images/f1.png>] <images/f2.png, id=183, 1397.22pt x 888.31876pt>
 File: images/f2.png Graphic file (type png)
 
 <use images/f2.png>
@@ -909,7 +909,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 176--178
 
  []
 
-<images/f3.png, id=143, 490.83376pt x 181.67876pt>
+<images/f3.png, id=189, 490.83376pt x 181.67876pt>
 File: images/f3.png Graphic file (type png)
  <use images/f3.png>
 Package pdftex.def Info: images/f3.png used on input line 183.
@@ -921,27 +921,27 @@ chapter 3.
 ]
 chapter 4.
 
-Underfull \hbox (badness 10000) in paragraph at lines 207--215
+Underfull \hbox (badness 10000) in paragraph at lines 231--240
 
  []
 
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 231.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 256.
 [7
 
 ]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 231.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 256.
  (./latex.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 231.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 231.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 256.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 256.
 Package rerunfilecheck Info: File `latex.out' has not changed.
-(rerunfilecheck)             Checksum: D1F30D4CAEEE58DAD9C99145901525E0;1594.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 231.
+(rerunfilecheck)             Checksum: 01E8A753CB9B32A98ED6C816CCFA6604;2320.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 256.
  ) 
 Here is how much of TeX's memory you used:
- 9895 strings out of 494447
- 154305 string characters out of 6166766
- 341427 words of memory out of 5000000
- 13102 multiletter control sequences out of 15000+600000
+ 9913 strings out of 494447
+ 154611 string characters out of 6166766
+ 343398 words of memory out of 5000000
+ 13111 multiletter control sequences out of 15000+600000
  9743 words of font info for 34 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
  41i,12n,66p,8505b,357s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -951,10 +951,10 @@ mbx12.pfb></usr/local/texlive/2016basic/texmf-dist/fonts/type1/public/amsfonts/
 cm/cmr10.pfb></usr/local/texlive/2016basic/texmf-dist/fonts/type1/public/amsfon
 ts/cm/cmssbx10.pfb></usr/local/texlive/2016basic/texmf-dist/fonts/type1/public/
 amsfonts/cm/cmti10.pfb>
-Output written on latex.pdf (9 pages, 493162 bytes).
+Output written on latex.pdf (9 pages, 499191 bytes).
 PDF statistics:
- 189 PDF objects out of 1000 (max. 8388607)
- 161 compressed objects within 2 object streams
- 30 named destinations out of 1000 (max. 500000)
- 194 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 239 PDF objects out of 1000 (max. 8388607)
+ 210 compressed objects within 3 object streams
+ 39 named destinations out of 1000 (max. 500000)
+ 266 words of extra memory for PDF output out of 10000 (max. 10000000)
 
