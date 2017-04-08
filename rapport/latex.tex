@@ -198,21 +198,39 @@ Le programme fonctionne en N parties.
 
 \subsection{Démarrage du serveur principal d'écoute des clients}
 
+Tout d'abord, nous récupérons les options demandées par le client à l'aide de la fonction getopt. Ensuite, soit nous affichons le manuel d'aide s'il nous est demandé, soit nous passons à la création du serveur:\\
+Pour le serveur et toutes les communications que nous faisons avec ce proxy, nous nous servons des socket tels que nous les avons vus en cours de RSA.\\
+Ainsi nous lions un socket d'écoute à un port (par default le port 80) sur lequel le navigateur du client pourra se connecter.\\
+Ensuite nous pouvons lancer la boucle principale d'écoute pour les clients. Celle-ci se chargera de récupérer toutes les requêtes arrivant depuis le port défini sur l'adresse localhost (127.0.0.1).\\
+Lorsqu'une requête arrive, on passe à l'étape suivante.
 \subsection{Lecture du header}
-
+ROMARIC!
 \subsection{Filtrage}
+ROMARIC!
+\subsection{Communication en HTTP}
 
-\subsection{Envoi des données en HTTP}
+Lorsque l'on détecte une demande http vers un serveur non bloqué, on crée un socket de dialogue vers ce navigateur (en lui envoyant la requête), et nous traitons son retour de manière détaillée:\\
+Tout d'abord, nous lisons (et envoyons au client) le header html de la réponse du serveur ligne par ligne (à l'aide de la fonction fgets) pour essayer d'y détecter le champ "Content-Lenght". Ce champ, dont la présence n'est pas obligatoire, nous indique par avance la taille du message attendu.\\\\
+Ensuite, nous lisons et envoyons au client le message caractère par caractère, en s'arrêtant lorsque l'on détecte un caractère EOF, ou lorsque l'on atteint la taille du message indiquée dans le header.\\
+Notre manière d'envoyer les données au client peut sembler être une immense perte de temps, mais ce n'est pas le cas car nous appliquons (ou du moins nous ne désactivons pas) l'algorithme de Naggle. Ainsi, même si l'on demande l'envoi de messages de 1 octet, ces derniers seront regroupés avant d'être envoyés au navigateur du client.\\
+Une fois la communication terminée, nous fermons les sockets de dialogue avec le client et le serveur, avant de terminer le processus qui se chargeait de la communication.
+\subsection{Communication en SSL}
 
-\subsection{Envoi des données en SSL}
+La communication en SSL (https) est différente de la communication en http car elle assure que le transport des données est complètement confidentiel, et que l'on ne peut pas lire le contenu des paquet sur le chemin (comme nous le faisons pour la communication http).\\ Le fonctionnement général de SSL est le suivant : \\
+Deux hôtes qui veulent se connecter vont d'abord s'accorder sur les clés de sécurité, version, ... C'est ce qu'on appelle le "handshake". Ensuite ces deux hôtes communiquent de manière totalement cryptée, et enfin ils peuvent vérifier des informations sur la communication après coup.\\\\
+
+Ainsi, nous avions deux choix :\\
+- Le premier était de créer un véritable serveur acceptant les connexion SSL du client, récupérant ses requêtes, et les relayant au serveur externe en se connectant à lui en SSL. Mais cela aurait allongé considérablement le temps de dialogue et il nous aurait fallu obtenir une PKI.\\
+- La seconde, que nous avons choisi, était de simplement faire office de tunnel pour la connexion SSL. C'est à dire que lorsque nous recevons un message du client, nous l'envoyons immédiatement au serveur distant, et vice-versa. Le problème causé par cette solution est que nous ne pouvons pas toujours connaître la terminaison de la discussion entre le serveur et le client, ainsi nous avons mis en place un mécanisme de timeout qui rompt la connexion au bout de 4 secondes sans réponse. Ceci nous permet aussi d'éviter d'attendre trop longtemps la réponse d'un serveur qui ne serait pas fonctionnel.
 
 \subsection{Divers}
 
 \section{Difficultés rencontrées}
 
 \subsection{Détection de la fin des transmissions}
-Dans un premier temps, nous nous attendions simplement à recevoir un message vide pour indiquer la fin des données transmises, cependant ce ne fut pas le cas, et bien que la page fut chargée entièrement, le navigateur continuait d'attendre la fin du chargement.\\
-GUILAUME!
+Dans un premier temps, nous nous attendions simplement à recevoir un message vide pour indiquer la fin des données transmises, cependant ce ne fut pas le cas, et bien que la page fut chargée entièrement, le navigateur continuait d'attendre la fin du chargement. \\
+De plus, la structure que nous utilisons pour faire nos communication (les sockets) se situent juste au dessus de TCP, et ainsi on ne peut pas récupérer les flags de ce protocole (le flag FIN aurait pu ici nous servir).\\
+Ainsi, la seule solution que nous ayons trouvé a été d'envoyer le message caractère par caractère jusqu'à la fin du message (signifiée soit par un EOF, soit lorsque l'on arrive au nombre de caractères s'il est spécifié dans le header html).
 
 \subsection{Plusieurs paquets du navigateur}
 Nous pensions à tort que l'entête HTTP était envoyée dans un seul paquet. Nous analysions et relayions ce paquet sans nous poser plus de questions. Cependant en allant sur le site de publicité http://01.net, nous avons très vite remarqué que les fervants utilisateurs de Cookies envoyaient de très lourds paquets aux serveurs.\\
@@ -249,8 +267,8 @@ Communication http                        & 1h              & 3h            \\
 Communication https                       & 0h              & 3h            \\
 Filtrage des publicité                    & 1h              & 0h            \\
 Corrections du code                       & 4h              & 4h           \\
-Rédaction du rapport                      & 3h              & 3h           \\
-\textbf{Total}                            & \textbf{16h}             & \textbf{16h}
+Rédaction du rapport                      & 3h              & 2h           \\
+\textbf{Total}                            & \textbf{16h}             & \textbf{15h}
 \end{tabular}
 
 \end{document}
