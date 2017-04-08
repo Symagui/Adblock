@@ -1,0 +1,1 @@
+Empécher l’erreur “Échec de la connexion sécurisée” lors de l’empêchement d’une page/pub HTTPS

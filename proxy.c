@@ -10,10 +10,12 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <regex.h>
+#include <ctype.h>
 
-#define PROXY_PORT 80
+#define PROXY_DEFAULT_PORT 80
 #define MAX_URLSIZE 2048
 #define TIMEOUT 4
+#define FILTERFILE "./mask.txt"
 
 
 #define MAX_SENDER_SIZE 1024
@@ -27,6 +29,7 @@
 #define COL_CYAN    "\x1b[36m"
 #define COL_RESET   "\x1b[0m"
 
+static int _proxy_port = PROXY_DEFAULT_PORT;
 
 struct host {
   int port;
@@ -87,16 +90,18 @@ struct slist {
 
 struct slist *_filters;
 
-int loadFilters(){
+int loadFilters(const char *filename){
   int size = 0;
-	FILE *fp = fopen("./filter1.txt", "rb");
+	FILE *fp = fopen(filename, "rb");
 
   char * line = NULL;
   size_t len = 0;
   ssize_t read;
 
-  if (fp == NULL)
-      exit(EXIT_FAILURE);
+  if (fp == NULL){
+    printf(COL_YELLOW "  Warning : File '%s' not found\n" COL_RESET, filename);
+    return 0;
+  }
 
   while ((read = getline(&line, &len, fp)) != -1) {
 
@@ -113,6 +118,8 @@ int loadFilters(){
   fclose(fp);
   if (line)
       free(line);
+
+  printf(COL_BLUE "  File '%s' loaded (%d masks)\n" COL_RESET, filename, size);
 
 	return size;
 }
@@ -425,8 +432,45 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 }
 
 
-int main(int argc, const char* argv[]){
+/*
+ * Show the manual
+*/
+void help(){
 
+	printf("SIMPLE PROXY\n\n");
+	printf("NOM\n		proxy - Filtrage de publicité et cache de données\n\n");
+	printf("SYNOPSIS\n		(sudo) ./proxy [OPTION]... [FICHIER FILTRE, FICHIER FILTRE, ...]\n\n");
+	printf("DESCRIPTION\n		Créé un proxy sur le port 80 (si non défini).\n\n");
+	printf("OPTIONS\n		Toutes les options se combinent.\n\n");
+	printf("		-h\n			Affichage de ce message.\n\n");
+  printf("		-p\n			Modification du port du proxy.\n\n");
+	printf("VALEUR DE RETOUR\n		Affichage des urls transmises et erreurs.\n\n");
+	printf("EXEMPLE\n		sudo ./proxy -p 400 mask.txt\n Démarre un proxy sur le port 400 en utilisant les filtres du fichier mask.txt\n\n");
+
+}
+
+
+int main(int argc, char* const* argv){
+
+  int c;
+	while ((c = getopt (argc, argv, "p:h")) != -1){
+		switch (c) {
+      case 'h':
+        help();
+        exit(0);
+        break;
+			case 'p':
+				_proxy_port = atoi(optarg);
+				if(!isdigit(optarg[0]) || _proxy_port<0){
+					printf(COL_RED "No valid argument given for -p option, set to default.\n" COL_RESET);
+					_proxy_port = PROXY_DEFAULT_PORT;
+				}
+				break;
+			default: // if ? encoutered, then there is an illegal opt
+				printf(COL_RED "This option (%s) isn't supported, please refer to the ptar manual with %s -h\n" COL_RESET,argv[optind-2],argv[0]);
+				exit(1); //Error
+		}
+	}
 
   ////////////////////////////////////////////////////
   //Start server-browser socket and wait for clients//
@@ -447,7 +491,7 @@ int main(int argc, const char* argv[]){
   memset (&serv_addr, 0, sizeof(serv_addr) );
   serv_addr.sin_family = PF_INET ;
   serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  serv_addr.sin_port = htons(PROXY_PORT);
+  serv_addr.sin_port = htons(_proxy_port);
   int ttl = 1;
   setsockopt(serverSocket, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
   setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
@@ -467,10 +511,19 @@ int main(int argc, const char* argv[]){
 
 
   //Load filters
-  int fsize = loadFilters();
-  printf(COL_GREEN "Filters loaded in RAM (%d)\n" COL_RESET, fsize);
+  int fsize = 0;
+  printf(COL_BLUE "Loading filters...\n" COL_RESET);
 
-  printf(COL_CYAN "\n|| Proxy started on port %i\n\n" COL_RESET, PROXY_PORT);
+  int arg_i;
+  for(arg_i=optind; arg_i<argc; arg_i++){
+    fsize += loadFilters(argv[arg_i]);
+  }
+
+  printf(COL_GREEN "%d filters loaded\n" COL_RESET, fsize);
+
+
+  //Start proxy
+  printf(COL_CYAN "\n|| Proxy started on port %i\n\n" COL_RESET, _proxy_port);
 
   /* Tout est ok */
   int dialogSocket;
