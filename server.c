@@ -12,8 +12,8 @@
 #include <regex.h>
 
 #define PROXY_PORT 80
-#define MAX_URLSIZE 512
-
+#define MAX_URLSIZE 2048
+#define TIMEOUT 4
 
 
 #define MAX_SENDER_SIZE 1024
@@ -279,6 +279,7 @@ int httpManager(int dialogSocket, struct header *hd, int respfd){
   char line[10000];
   long contentl = -1;
   int achar = 0;
+
   while (fgets( line, sizeof(line), socketfp) != (char*) 0){
     if ( strcmp( line, "\n" ) == 0 || strcmp( line, "\r\n" ) == 0 ){
       //End of header
@@ -291,6 +292,7 @@ int httpManager(int dialogSocket, struct header *hd, int respfd){
       contentl = atol(&(line[15]));
     }
   }
+
   //const char *connection_close = "Connection: close\r\n";
   //send(dialogSocket, connection_close, strlen(connection_close), 0);
   send(dialogSocket, line, strlen(line), 0);
@@ -315,7 +317,7 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
   //int i = 1;
   // Timeout de 4 secondes
   struct timeval timeout;
-  timeout.tv_sec = 4;
+  timeout.tv_sec = TIMEOUT;
   timeout.tv_usec = 0;
   //Send OK to the browser for ssl connection
   const char *connection_established = "HTTP/1.0 200 Connection established\r\n\r\n";
@@ -378,43 +380,45 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   //printf("dialogSocket = %d\n", dialogSocket);
 
   //Get data
-  char rcv_buffer[MAX_SENDER_SIZE];
-  int n = 0;
+  char rcv_buffer[4096];
+  int n = 1;
+  while(n>0){
 
-  if((n = recv(dialogSocket, rcv_buffer, sizeof rcv_buffer - 1, 0)) < 0)
-  {
-      perror("recv()");
-      exit(1);
+    if((n = recv(dialogSocket, rcv_buffer, sizeof(rcv_buffer) - 1, 0)) < 0)
+    {
+        perror("recv()");
+        exit(1);
+    }
+
+    rcv_buffer[n] = '\0';
+
+    //Get host
+    struct header *hd;
+    hd = malloc(sizeof(struct header));
+    fillHeader(hd, rcv_buffer);
+
+    if (isAd(hd)){
+      printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
+      header_ok(dialogSocket);
+      close(dialogSocket);
+      return 0;
+    } else {
+      printf("> " COL_GREEN "(VALID) " COL_RESET " %s\n", hd->path);
+    }
+
+    //Relaying to real server
+    int respfd = getRealServer(&hd->hst);
+
+    if(hd->ssl==1){
+      httpsManager(dialogSocket, hd, respfd);
+    }else{
+      send(respfd, rcv_buffer, strlen(rcv_buffer), 0);
+      httpManager(dialogSocket, hd, respfd);
+    }
+    free(hd);
+
   }
 
-  rcv_buffer[n] = '\0';
-
-  //Get host
-  struct header *hd;
-  hd = malloc(sizeof(struct header));
-  fillHeader(hd, rcv_buffer);
-
-  if (isAd(hd)){
-    printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
-    header_ok(dialogSocket);
-    close(dialogSocket);
-    return 0;
-  } else {
-    printf("> " COL_GREEN "(VALID) " COL_RESET " %s\n", hd->path);
-  }
-
-  //Relaying to real server
-  int respfd = getRealServer(&hd->hst);
-
-  if(hd->ssl==1){
-    httpsManager(dialogSocket, hd, respfd);
-  }else{
-		printf("test\n");
-    send(respfd, rcv_buffer, strlen(rcv_buffer), 0);
-    httpManager(dialogSocket, hd, respfd);
-  }
-
-  free(hd);
   close(dialogSocket);
 
   return 0;
