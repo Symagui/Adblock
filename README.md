@@ -21,6 +21,8 @@ OPTIONS
 			Affichage de ce message.
 		-p
 			Modification du port du proxy.
+		-q
+			N'affiche aucun message dans la console autre que l'aide.
 EXEMPLE
 		sudo ./proxy -p 400 mask.txt
     Démarre un proxy sur le port 400 en utilisant les filtres du fichier mask.txt

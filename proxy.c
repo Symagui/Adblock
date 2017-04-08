@@ -437,7 +437,7 @@ void help(){
 	printf("OPTIONS\n		Toutes les options se combinent.\n\n");
 	printf("		-h\n			Affichage de ce message.\n\n");
   printf("		-p\n			Modification du port du proxy.\n\n");
-	printf("		-q\n			N'affiche aucun message dans la console autre que l'aide\n\n");
+	printf("		-q\n			N'affiche aucun message dans la console autre que l'aide.\n\n");
 	printf("VALEUR DE RETOUR\n		Affichage des urls transmises et erreurs.\n\n");
 	printf("EXEMPLE\n		sudo ./proxy -p 400 mask.txt\n Démarre un proxy sur le port 400 en utilisant les filtres du fichier mask.txt\n\n");
 
