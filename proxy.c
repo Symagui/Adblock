@@ -333,7 +333,7 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
   // On crée une connexion entre le client et le serveur dans le cas du ssl (on sert juste de tunnel)
   // Sauf si l'addresse fait partie des filtrées
   for(;;){
-    
+
     FD_ZERO(&fdset);
     FD_SET(dialogSocket, &fdset);
     FD_SET(respfd, &fdset);
@@ -381,43 +381,51 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 
   //Get data
   char rcv_buffer[4096];
-  int n = 1;
-  while(n>0){
+  int initialLength = 0;
 
-    if((n = recv(dialogSocket, rcv_buffer, sizeof(rcv_buffer) - 1, 0)) < 0)
-    {
-        if (q) perror("recv()");
-        exit(1);
-    }
+  if((initialLength = recv(dialogSocket, rcv_buffer, sizeof(rcv_buffer) - 1, 0)) < 0)
+  {
+      if (q) perror("recv()");
+      exit(1);
+  }
 
-    rcv_buffer[n] = '\0';
+  rcv_buffer[initialLength] = '\0';
 
-    //Get host
-    struct header *hd;
-    hd = malloc(sizeof(struct header));
-    fillHeader(hd, rcv_buffer);
+  //Get host
+  struct header *hd;
+  hd = malloc(sizeof(struct header));
+  fillHeader(hd, rcv_buffer);
 
-    if (isAd(hd)){
-      if (q) printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
-      header_ok(dialogSocket);
-      close(dialogSocket);
-      return 0;
-    } else {
-      if (q) printf("> " COL_GREEN "(VALID) " COL_RESET " %s\n", hd->path);
-    }
+  if (isAd(hd)){
+    if (q) printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
+    header_ok(dialogSocket);
+    close(dialogSocket);
+    return 0;
+  } else {
+    if (q) printf("> " COL_GREEN "(VALID) " COL_RESET " %s\n", hd->path);
+  }
 
-    //Relaying to real server
-    int respfd = getRealServer(&hd->hst);
+  //Relaying to real server
+  int respfd = getRealServer(&hd->hst);
 
-    if(hd->ssl==1){
-      httpsManager(dialogSocket, hd, respfd);
-    }else{
-      send(respfd, rcv_buffer, strlen(rcv_buffer), 0);
-      httpManager(dialogSocket, hd, respfd);
-    }
-    free(hd);
+  if(hd->ssl==1){
+    httpsManager(dialogSocket, hd, respfd);
+  }else{
+
+    do{
+      send(respfd, rcv_buffer, initialLength, 0);
+      if(rcv_buffer[initialLength-1]=='\n' && rcv_buffer[initialLength-2]=='\r'){
+        initialLength = 0;
+      }else{
+        initialLength = recv(dialogSocket, rcv_buffer, sizeof(rcv_buffer) - 1, 0);
+        rcv_buffer[initialLength] = '\0';
+      }
+    }while(initialLength>0);
+
+    httpManager(dialogSocket, hd, respfd);
 
   }
+  free(hd);
 
   close(dialogSocket);
 
@@ -445,7 +453,7 @@ void help(){
 
 
 int main(int argc, char* const* argv){
-  
+
   int c;
 	while ((c = getopt (argc, argv, "p:hq")) != -1){
 		switch (c) {

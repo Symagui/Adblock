@@ -197,6 +197,17 @@ Une bonne partie de cette liste concerne des éléments du contenu HTML d'un sit
 
 \section{Difficultés rencontrées}
 
+\subsection{Détection de la fin des transmissions}
+Dans un premier temps, nous nous attendions simplement à recevoir un message vide pour indiquer la fin des données transmises, cependant ce ne fut pas le cas, et bien que la page fut chargée entièrement, le navigateur continuait d'attendre la fin du chargement.\\
+[GUILLAUME]
+
+\subsection{Plusieurs paquets du navigateur}
+Nous pensions à tort que l'entête HTTP était envoyée dans un seul paquet. Nous analysions et relayions ce paquet sans nous poser plus de questions. Cependant en allant sur le site de publicité http://01.net, nous avons très vite remarqué que les fervants utilisateurs de Cookies envoyaient de très lourds paquets aux serveurs.\\
+Et contre-intuitivement, il ne fallait pas récupérer l'ensemble des données et tenter de tout envoyer au serveur. Il fallait effectuer toute la procédure d'envoi pour chaque paquet, car il semblerait que quand le paquet est trop long, le navigateur recréé une entête HTTP contenant la méthode spéciale 
+
+\subsection{Préparation à l'IPv6}
+Dans un premier temps, nous avons utilisé gethostbyname(1) pour obtenir une adresse IPv4 correspondant à un nom de domaine. Cependant il fallait prendre en compte l'utilisation des adresses IPv6 qui commencent à être de plus en plus utilisées sur Internet.\\
+Pour celà nous avons utilisé getaddrinfo(3) qui prend en argument le nom de domaine et le port. La modification du code ne s'est pas faite facilement, et c'est en étudiant d'autres codes et comparant plusieurs documentations que nous avons compris que nous pouvions caster les structures prévues pour l'IPv4 et celles pour l'IPv6 afin de les rendre compréhensibles par la fonction socket(4).
 
 \chapter{Conclusion}
 
@@ -208,25 +219,25 @@ Une bonne partie de cette liste concerne des éléments du contenu HTML d'un sit
 Nous utilisons plusieurs systèmes et logiciels.\\
 La gestion des version s'est faite via un repository github et donc en utilisant l'outil git.\\
 L'écriture de ce rapport a été effectuée sous le langage LaTeX.\\
-Les systèmes d'exploitations utilisés ont été Mac OS X, Ubuntu et Windows 10 (sous-système Windows pour Linux).\\
-Les éditeurs utilisés pour la programmation ont été Atom et Visual Studio Code.\\\\
+Les systèmes d'exploitations utilisés ont été Mac OS X et Ubuntu.\\
+L'éditeur utilisé pour la programmation a été Atom.\\\\
 \textbf{Correction des erreurs :}\\
-Nous avons utilisé le compilateur GCC pour le développement, Valgrind pour la vérification des fuites mémoires et Valgrind + Helgrind pour la vérification des erreurs de multi-threading.
+Nous avons utilisé le compilateur GCC pour le développement et la correction d'erreurs.\\
+Nous avons utilisé le debogueur intégré aux navigateurs Firefox et Chrome pour vérifier l'intégralité ou non des données reçue et la comparaison des entêtes.
 
 \section{Répartition du temps}
 
 \begin{tabular}{lll}
                                           & \textbf{Romaric MOLLARD} & \textbf{Guillaume RUCHOT} \\
-Partie 1 - Lecture basique                & 0h              & 3h            \\
-Partie 2 - Lecture des options            & 2h              & 0h            \\
-Partie 3 - Extraction                     & 0h              & 4h            \\
-Partie 4 - Lecture et extraction avancées & 5h              & 1h            \\
-Partie 5 - Ajout des threads              & 5h              & 4h           \\
-Partie 6 - Archives compressées           & 4h              & 0h            \\
-Partie 7 - Checksum                       & 1h              & 0h            \\
-Corrections du code                       & 10h             & 8h           \\
-Rédaction du rapport                      & 4h              & 2h           \\
-\textbf{Total}                            & \textbf{26h}             & \textbf{22h}
+Observations Wireshark                    & 2h              & 2h            \\
+Création de la base du proxy              & 2h              & 1h            \\
+Lecture des entêtes                       & 3h              & 0h            \\
+Communication http                        & 1h              & 3h            \\
+Communication https                       & 0h              & 3h            \\
+Filtrage des publicité                    & 1h              & 0h            \\
+Corrections du code                       & 4h              & 4h           \\
+Rédaction du rapport                      & 3h              & 3h           \\
+\textbf{Total}                            & \textbf{16h}             & \textbf{16h}
 \end{tabular}
 
 \end{document}
