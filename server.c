@@ -12,8 +12,11 @@
 #include <regex.h>
 
 #define PROXY_PORT 80
-#define MAX_RESPONSE_SIZE 4096
-#define MAX_SENDER_SIZE 4096
+#define MAX_URLSIZE 512
+
+
+
+#define MAX_SENDER_SIZE 1024
 
 //Colors
 #define COL_RED     "\x1b[31m"
@@ -77,7 +80,70 @@ char * getValueByKey(char httpHeader[], const char *key){
 * Filter ads (return 1 if request an ad)
 */
 
+struct slist {
+  char value[MAX_URLSIZE];
+  struct slist *_prev;
+};
+
+struct slist *_filters;
+
+int loadFilters(){
+  int size = 0;
+	FILE *fp = fopen("./filter1.txt", "rb");
+
+  char * line = NULL;
+  size_t len = 0;
+  ssize_t read;
+
+  if (fp == NULL)
+      exit(EXIT_FAILURE);
+
+  while ((read = getline(&line, &len, fp)) != -1) {
+
+    struct slist *prev = _filters;
+    struct slist *new = malloc(sizeof(struct slist));
+    strncpy(new->value, line, MAX_URLSIZE);
+    new->_prev = prev;
+    _filters = new;
+
+    size++;
+
+  }
+
+  fclose(fp);
+  if (line)
+      free(line);
+
+	return size;
+}
+
+int contain(char *str, char *needle){
+
+  int nlen = strlen(needle);
+  int str_len = strlen(str);
+
+  char * pos;
+  for(pos = str; pos<str+str_len-nlen+1; pos++){
+    if(strncmp(pos, needle, nlen-1)==0){
+      return 1;
+    }
+  }
+  return 0;
+}
+
 int isAd(struct header *hd){
+
+  //To long url for filter file
+  if(strlen(hd->path)>MAX_URLSIZE){
+    return 1;
+  }
+
+  struct slist *res;
+  for(res=_filters; res!=NULL; res=res->_prev){
+    if(contain(hd->path,res->value)){
+      return 1;
+    }
+  }
 
   return 0;
 }
@@ -142,7 +208,7 @@ void fillHeader(struct header *hd, char *src_hd){
     hints.ai_family = PF_UNSPEC;    /* Allow IPv4 or IPv6 */
     hints.ai_socktype = SOCK_STREAM; /* TCP for HTTP server */
     char sport[16];
-    (void) sprintf( sport, "%d", (int) hd->hst.port );
+    sprintf( sport, "%d", (int) hd->hst.port );
     if(getaddrinfo(hd->hostname,sport, &hints, &result) != 0){
       //TODO Server not found
       exit(0);
@@ -322,12 +388,12 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   fillHeader(hd, rcv_buffer);
 
   if (isAd(hd)){
-    printf("> (INVALID) %s\n", hd->path);
+    printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
     header_ok(dialogSocket);
     close(dialogSocket);
     return 0;
   } else {
-    printf("> (VALID) %s\n", hd->path);
+    printf("> " COL_GREEN "(VALID) " COL_RESET " %s\n", hd->path);
   }
 
   //Relaying to real server
@@ -386,6 +452,11 @@ int main(int argc, const char* argv[]){
     exit (1);
   }
   printf(COL_GREEN "Max connexion OK (%d)\n" COL_RESET, SOMAXCONN);
+
+
+  //Load filters
+  int fsize = loadFilters();
+  printf(COL_GREEN "Filters loaded in RAM (%d)\n" COL_RESET, fsize);
 
   printf(COL_CYAN "\n|| Proxy started on port %i\n\n" COL_RESET, PROXY_PORT);
 
