@@ -204,7 +204,36 @@ Ainsi nous lions un socket d'écoute à un port (par default le port 80) sur leq
 Ensuite nous pouvons lancer la boucle principale d'écoute pour les clients. Celle-ci se chargera de récupérer toutes les requêtes arrivant depuis le port défini sur l'adresse localhost (127.0.0.1).\\
 Lorsqu'une requête arrive, on passe à l'étape suivante.
 \subsection{Lecture du header}
-ROMARIC!
+
+Pour simplifier les fonctions suivantes du programme, nous chargeons les différentes données disponibles dans une structure header dont le schéma est le suivant :\\
+\code{
+  struct header {
+    char ssl; //1 si c'est une connexion HTTPS
+    char method[500]; //GET, CONNECT, POST...
+    char path[500]; //Chemin demandé
+    char protocol[500]; //HTTP/1.1 par exemple
+    char hostname[500]; //Nom du domaine
+    struct host hst; //Données calculées selon le nom de domaine pour obtenir une adresse réelle sur le réseau.
+  };
+  struct host {
+    int port; //Port
+    int addr_family; //Type d'adresse (AF_INET pour IPv4, AF_INET6 pour IPv6)
+    int addr_len;
+    struct sockaddr_in6 addr;
+  };
+}
+\\
+Pour commencer, les premières données se trouvent dans la première ligne de l'entête HTTP qui est de la forme\\
+METHODE URLPATH PROTOCOLE,\\
+Par exemple :\\
+GET https://www.wireshark.org/lists/ HTTP/1.1\\
+Nous décomposons les différents morceaux de cette première ligne à l'aide de la fonction strchr(2) qui nous renvoie la position du prochain caractère demandé (ici espace).\\
+Ensuite, les autres données sont disponibles sous la forme :\\
+Clé: valeur\\
+Nous avons donc créé une fonction qui recherche une valeur en fonction d'une clé, sous ce format précis. Ainsi nous récupérons la donnée très importante associée à la clé "Host: ". Cette valeur n'est rien d'autre que le domaine avec le quel nous devrons communiquer.\\
+\\
+Il reste alors le champ "hst" à remplir, qui contiendra une véritable adresse IPv4 ou IPv6. TODO
+
 \subsection{Filtrage}
 ROMARIC!
 \subsection{Communication en HTTP}
@@ -223,7 +252,6 @@ Ainsi, nous avions deux choix :\\
 - Le premier était de créer un véritable serveur acceptant les connexion SSL du client, récupérant ses requêtes, et les relayant au serveur externe en se connectant à lui en SSL. Mais cela aurait allongé considérablement le temps de dialogue et il nous aurait fallu obtenir une PKI.\\
 - La seconde, que nous avons choisi, était de simplement faire office de tunnel pour la connexion SSL. C'est à dire que lorsque nous recevons un message du client, nous l'envoyons immédiatement au serveur distant, et vice-versa. Le problème causé par cette solution est que nous ne pouvons pas toujours connaître la terminaison de la discussion entre le serveur et le client, ainsi nous avons mis en place un mécanisme de timeout qui rompt la connexion au bout de 4 secondes sans réponse. Ceci nous permet aussi d'éviter d'attendre trop longtemps la réponse d'un serveur qui ne serait pas fonctionnel.
 
-\subsection{Divers}
 
 \section{Difficultés rencontrées}
 
@@ -262,13 +290,13 @@ Nous avons utilisé le debogueur intégré aux navigateurs Firefox et Chrome pou
                                           & \textbf{Romaric MOLLARD} & \textbf{Guillaume RUCHOT} \\
 Observations Wireshark                    & 2h              & 2h            \\
 Création de la base du proxy              & 2h              & 1h            \\
-Lecture des entêtes                       & 3h              & 0h            \\
+Lecture des entêtes                       & 2h              & 0h            \\
 Communication http                        & 1h              & 3h            \\
 Communication https                       & 0h              & 3h            \\
 Filtrage des publicité                    & 1h              & 0h            \\
 Corrections du code                       & 4h              & 4h           \\
 Rédaction du rapport                      & 3h              & 2h           \\
-\textbf{Total}                            & \textbf{16h}             & \textbf{15h}
+\textbf{Total}                            & \textbf{15h}             & \textbf{15h}
 \end{tabular}
 
 \end{document}
