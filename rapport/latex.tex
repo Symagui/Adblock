@@ -36,8 +36,10 @@ linktoc=page % only page is linked
 \renewcommand\contentsname{Sommaire}%
 }
 
-\def\nbpage{5}
+\def\nbpage{10}
 
+\def\code#1{\texttt{#1}}
+\let\tab\quad
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhead[L]{RSA Réseau, Projet MyAdBlock}
@@ -207,39 +209,43 @@ Lorsqu'une requête arrive, on passe à l'étape suivante.
 
 Pour simplifier les fonctions suivantes du programme, nous chargeons les différentes données disponibles dans une structure header dont le schéma est le suivant :\\
 \code{
-  struct header {
-    char ssl; //1 si c'est une connexion HTTPS
-    char method[500]; //GET, CONNECT, POST...
-    char path[500]; //Chemin demandé
-    char protocol[500]; //HTTP/1.1 par exemple
-    char hostname[500]; //Nom du domaine
-    struct host hst; //Données calculées selon le nom de domaine pour obtenir une adresse réelle sur le réseau.
-  };
-  struct host {
-    int port; //Port
-    int addr_family; //Type d'adresse (AF_INET pour IPv4, AF_INET6 pour IPv6)
-    int addr_len;
-    struct sockaddr_in6 addr;
-  };
+  struct header {\\
+  \tab  char ssl; //1 si c'est une connexion HTTPS\\
+  \tab  char method[500]; //GET, CONNECT, POST...\\
+  \tab  char path[500]; //Chemin demandé\\
+  \tab  char protocol[500]; //HTTP/1.1 par exemple\\
+  \tab  char hostname[500]; //Nom du domaine\\
+  \tab  struct host hst; //Données calculées selon le nom de domaine pour obtenir une adresse réelle sur le réseau.\\
+  };\\
+  struct host {\\
+  \tab  int port; //Port\\
+  \tab  int addr_family; //Type d'adresse (AF_INET pour IPv4, AF_INET6 pour IPv6)\\
+  \tab  int addr_len;\\
+  \tab  struct sockaddr_in6 addr;\\
+  };\\
 }
 \\
 Pour commencer, les premières données se trouvent dans la première ligne de l'entête HTTP qui est de la forme\\
-METHODE URLPATH PROTOCOLE,\\
+\code{METHODE URLPATH PROTOCOLE},\\
 Par exemple :\\
-GET https://www.wireshark.org/lists/ HTTP/1.1\\
-Nous décomposons les différents morceaux de cette première ligne à l'aide de la fonction strchr(2) qui nous renvoie la position du prochain caractère demandé (ici espace).\\
+\code{GET https://www.wireshark.org/lists/ HTTP/1.1}\\
+Nous décomposons les différents morceaux de cette première ligne à l'aide de la fonction \code{strchr(2)} qui nous renvoie la position du prochain caractère demandé (ici espace).\\
 Ensuite, les autres données sont disponibles sous la forme :\\
 Clé: valeur\\
 Nous avons donc créé une fonction qui recherche une valeur en fonction d'une clé, sous ce format précis. Ainsi nous récupérons la donnée très importante associée à la clé "Host: ". Cette valeur n'est rien d'autre que le domaine avec le quel nous devrons communiquer.\\
 \\
-Il reste alors le champ "hst" à remplir, qui contiendra une véritable adresse IPv4 ou IPv6. TODO
+Il reste alors le champ \code{hst} à remplir, qui contiendra une véritable adresse IPv4 ou IPv6. Nous utilisons la fonction \code{getaddrinfo(3)} et récupérons de préférence une adresse IPv4 parmis les résultats retournés (cette fonction retourne une liste d'adresses correspondantes). Sinon nous prenons la version IPv6 si aucune version IPv4 n'est disponible.
 
 \subsection{Filtrage}
-ROMARIC!
+Avant de démarrer le proxy, nous chargeons les fichiers filtres donnés en paramètres, chaque masque (et donc chaque ligne) est chargé dans une linked liste.\\
+Une fois que nous avons l'entête utilisable, nous pouvons effectuer un filtrage par exemple sur le paramètre \code{path}, qui contient le plus d'information utile sur l'URL. Nous regardons alors pour chaque élément de la précédente liste si cet élément est entièrement contenu dans l'url donnée.\\
+Si c'est le cas, alors nous considérons que nous avons une publicité et nous renvoyons une réponse vide et valide (HTTP 200 OK).
+
+
 \subsection{Communication en HTTP}
 
 Lorsque l'on détecte une demande http vers un serveur non bloqué, on crée un socket de dialogue vers ce navigateur (en lui envoyant la requête), et nous traitons son retour de manière détaillée:\\
-Tout d'abord, nous lisons (et envoyons au client) le header html de la réponse du serveur ligne par ligne (à l'aide de la fonction fgets) pour essayer d'y détecter le champ "Content-Lenght". Ce champ, dont la présence n'est pas obligatoire, nous indique par avance la taille du message attendu.\\\\
+Tout d'abord, nous lisons (et envoyons au client) le header html de la réponse du serveur ligne par ligne (à l'aide de la fonction \code{fgets()}) pour essayer d'y détecter le champ "Content-Lenght". Ce champ, dont la présence n'est pas obligatoire, nous indique par avance la taille du message attendu.\\\\
 Ensuite, nous lisons et envoyons au client le message caractère par caractère, en s'arrêtant lorsque l'on détecte un caractère EOF, ou lorsque l'on atteint la taille du message indiquée dans le header.\\
 Notre manière d'envoyer les données au client peut sembler être une immense perte de temps, mais ce n'est pas le cas car nous appliquons (ou du moins nous ne désactivons pas) l'algorithme de Naggle. Ainsi, même si l'on demande l'envoi de messages de 1 octet, ces derniers seront regroupés avant d'être envoyés au navigateur du client.\\
 Une fois la communication terminée, nous fermons les sockets de dialogue avec le client et le serveur, avant de terminer le processus qui se chargeait de la communication.
@@ -252,6 +258,15 @@ Ainsi, nous avions deux choix :\\
 - Le premier était de créer un véritable serveur acceptant les connexion SSL du client, récupérant ses requêtes, et les relayant au serveur externe en se connectant à lui en SSL. Mais cela aurait allongé considérablement le temps de dialogue et il nous aurait fallu obtenir une PKI.\\
 - La seconde, que nous avons choisi, était de simplement faire office de tunnel pour la connexion SSL. C'est à dire que lorsque nous recevons un message du client, nous l'envoyons immédiatement au serveur distant, et vice-versa. Le problème causé par cette solution est que nous ne pouvons pas toujours connaître la terminaison de la discussion entre le serveur et le client, ainsi nous avons mis en place un mécanisme de timeout qui rompt la connexion au bout de 4 secondes sans réponse. Ceci nous permet aussi d'éviter d'attendre trop longtemps la réponse d'un serveur qui ne serait pas fonctionnel.
 
+\subsection{Résultat}
+
+Comme nous pouvons le voir sur l'image suivante, nous filtrons avec succès la publicité présente sur le site leboncoin.fr.
+
+\begin{center}
+  \includegraphics[height=7.5cm]{images/f4.png}
+  \\
+  \textit{Figure 4 : À gauche Firefox utilisant le proxy, à droite Chrome sans proxy.}
+\end{center}
 
 \section{Difficultés rencontrées}
 
@@ -265,13 +280,19 @@ Nous pensions à tort que l'entête HTTP était envoyée dans un seul paquet. No
 Nous avons donc édité le code pour envoyer chaque morceaux comme nous le faisons dans l'autre sens pour la réception des pages web.
 
 \subsection{Préparation à l'IPv6}
-Dans un premier temps, nous avons utilisé gethostbyname(1) pour obtenir une adresse IPv4 correspondant à un nom de domaine. Cependant il fallait prendre en compte l'utilisation des adresses IPv6 qui commencent à être de plus en plus utilisées sur Internet.\\
-Pour celà nous avons utilisé getaddrinfo(3) qui prend en argument le nom de domaine et le port. La modification du code ne s'est pas faite facilement, et c'est en étudiant d'autres codes et comparant plusieurs documentations que nous avons compris que nous pouvions caster les structures prévues pour l'IPv4 et celles pour l'IPv6 afin de les rendre compréhensibles par la fonction socket(4).
+Dans un premier temps, nous avons utilisé \code{gethostbyname(1)} pour obtenir une adresse IPv4 correspondant à un nom de domaine. Cependant il fallait prendre en compte l'utilisation des adresses IPv6 qui commencent à être de plus en plus utilisées sur Internet.\\
+Pour celà nous avons utilisé \code{getaddrinfo(3)} qui prend en argument le nom de domaine et le port. La modification du code ne s'est pas faite facilement, et c'est en étudiant d'autres codes et comparant plusieurs documentations que nous avons compris que nous pouvions caster les structures prévues pour l'IPv4 et celles pour l'IPv6 afin de les rendre compréhensibles par la fonction \code{socket(4)}.
 
 \chapter{Conclusion}
 
-\section{Conclusion}
+\section{Limites et améliorations du programme}
+Pour le moment le filtrage des url se fait après la recherche de l'adresse associée au nom de domaine, ce qui utilise légèrement le réseau alors que nous allons ignorer la réponse.\\
+\\
+Nous ne sommes pas capables d'éditer directement le code HTML retourné car il est souvent compressé ou crypté dans le cas d'une connexion HTTPS. Nous sommes alors très limité car nous utilisons seulement les données disponibles dans l'entête HTTP.\\
 
+
+\section{Conclusion}
+Pour conclure, ce projet nous a permis de mieux comprendre les rouages des navigateurs d'un côté et des serveurs web de l'autre. Enfin nous prenons conscience de la précision nécessaire sur les données dans chaque protocole pour que toutes les transmissions soient correctes et complètes, ce qui nous semble de plus en plus classique pourtant avec notre utilisation importante d'Internet.
 
 \section{Méthodes et outils}
 \textbf{Programmation :}\\
