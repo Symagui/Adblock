@@ -28,7 +28,7 @@
 #define COL_MAGENTA "\x1b[35m"
 #define COL_CYAN    "\x1b[36m"
 #define COL_RESET   "\x1b[0m"
-
+int q=1;
 static int _proxy_port = PROXY_DEFAULT_PORT;
 
 struct host {
@@ -99,7 +99,7 @@ int loadFilters(const char *filename){
   ssize_t read;
 
   if (fp == NULL){
-    printf(COL_YELLOW "  Warning : File '%s' not found\n" COL_RESET, filename);
+    if (q) printf(COL_YELLOW "  Warning : File '%s' not found"COL_RESET"\n" , filename);
     return 0;
   }
 
@@ -119,7 +119,7 @@ int loadFilters(const char *filename){
   if (line)
       free(line);
 
-  printf(COL_BLUE "  File '%s' loaded (%d masks)\n" COL_RESET, filename, size);
+  if (q) printf(COL_BLUE "  File '%s' loaded (%d masks)"COL_RESET"\n", filename, size);
 
 	return size;
 }
@@ -223,7 +223,7 @@ void fillHeader(struct header *hd, char *src_hd){
     sprintf( sport, "%d", (int) hd->hst.port );
 		int test;
     if((test = getaddrinfo(hd->hostname,sport, &hints, &result)) != 0){
-			printf("ERROR : getaddrinfo : %s\n", gai_strerror(test));
+			if (q) perror(("ERROR : getaddrinfo : %s\n", gai_strerror(test)));
       //TODO Server not found
       exit(0);
     }
@@ -241,7 +241,7 @@ void fillHeader(struct header *hd, char *src_hd){
 
     }
 
-    //Show result
+    //Show result - Useful for debug
     //printf("\nHEADER :\n");
     //printf("  method '%s'\n", hd->method);
     //printf("  path '%s'\n", hd->path);
@@ -270,7 +270,7 @@ int getRealServer(struct host *dst){
   int sock = socket(dst->addr_family,SOCK_STREAM,0);
 
   if (connect(sock, (struct sockaddr*) &dst->addr, dst->addr_len) != 0){
-      perror("error connect\n");
+      if (q) perror("error connect\n");
       exit(0);
   }
 
@@ -333,17 +333,17 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
   // On crée une connexion entre le client et le serveur dans le cas du ssl (on sert juste de tunnel)
   // Sauf si l'addresse fait partie des filtrées
   for(;;){
-    //printf("message number %d for this ssl connection\n", i++);
+    
     FD_ZERO(&fdset);
     FD_SET(dialogSocket, &fdset);
     FD_SET(respfd, &fdset);
     err = select(maxfdp, &fdset, NULL, NULL, &timeout); //TODO set a timeout
     if (err < 0){
-      printf(COL_RED "ERROR with select on https connection\n" COL_RESET);
+      if (q) perror(COL_RED "ERROR with select on https connection"COL_RESET"\n");
       exit(1);
     }
     if (err == 0){
-      printf(COL_YELLOW "WARNING connection timeout\n" COL_RESET);
+      if (q) printf(COL_YELLOW "WARNING connection timeout"COL_RESET"\n");
       const char *connection_timeout = "HTTP/1.0 499 Connection timeout\r\n\r\n";
       send(dialogSocket, connection_timeout, strlen(connection_timeout), 0);
       break;
@@ -353,38 +353,31 @@ int httpsManager(int dialogSocket, struct header *fd, int respfd){
       // the client has send something, we must relay (err = 0 means end of connection)
       err = read(dialogSocket, buf, sizeof(buf));
       if (err <= 0){
-        //printf("end of connection client side 1\n");
         break;
       }
       err = write(respfd, buf, err);
       if (err <= 0){
-        //printf("end of connection server side 1\n");
         break;
       }
     } else if (FD_ISSET(respfd, &fdset)){
       //The server has sent something, we must relay (err = 0 means end of connection)
       err = read(respfd, buf, sizeof(buf));
       if (err <= 0){
-        //printf("end of connection server side 2\n");
         break;
       }
       err = write(dialogSocket, buf, err);
       if (err <= 0){
-        //printf("end of connection client side 2\n");
         break;
       }
     }
-    //break;
   }
-  //header_ok(dialogSocket);
-  //printf("closed because https!\n");
   return 0;
 }
 
 
 int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_addr){
 
-  //printf("dialogSocket = %d\n", dialogSocket);
+  //printf("dialogSocket = %d\n", dialogSocket); //Useful for debug
 
   //Get data
   char rcv_buffer[4096];
@@ -393,7 +386,7 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 
     if((n = recv(dialogSocket, rcv_buffer, sizeof(rcv_buffer) - 1, 0)) < 0)
     {
-        perror("recv()");
+        if (q) perror("recv()");
         exit(1);
     }
 
@@ -405,12 +398,12 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
     fillHeader(hd, rcv_buffer);
 
     if (isAd(hd)){
-      printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
+      if (q) printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
       header_ok(dialogSocket);
       close(dialogSocket);
       return 0;
     } else {
-      printf("> " COL_GREEN "(VALID) " COL_RESET " %s\n", hd->path);
+      if (q) printf("> " COL_GREEN "(VALID) " COL_RESET " %s\n", hd->path);
     }
 
     //Relaying to real server
@@ -437,13 +430,14 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 */
 void help(){
 
-	printf("SIMPLE PROXY\n\n");
+	printf("\n\nSIMPLE PROXY\n\n");
 	printf("NOM\n		proxy - Filtrage de publicité et cache de données\n\n");
 	printf("SYNOPSIS\n		(sudo) ./proxy [OPTION]... [FICHIER FILTRE, FICHIER FILTRE, ...]\n\n");
 	printf("DESCRIPTION\n		Créé un proxy sur le port 80 (si non défini).\n\n");
 	printf("OPTIONS\n		Toutes les options se combinent.\n\n");
 	printf("		-h\n			Affichage de ce message.\n\n");
   printf("		-p\n			Modification du port du proxy.\n\n");
+	printf("		-q\n			N'affiche aucun message dans la console autre que l'aide\n\n");
 	printf("VALEUR DE RETOUR\n		Affichage des urls transmises et erreurs.\n\n");
 	printf("EXEMPLE\n		sudo ./proxy -p 400 mask.txt\n Démarre un proxy sur le port 400 en utilisant les filtres du fichier mask.txt\n\n");
 
@@ -451,9 +445,9 @@ void help(){
 
 
 int main(int argc, char* const* argv){
-
+  
   int c;
-	while ((c = getopt (argc, argv, "p:h")) != -1){
+	while ((c = getopt (argc, argv, "p:hq")) != -1){
 		switch (c) {
       case 'h':
         help();
@@ -462,12 +456,15 @@ int main(int argc, char* const* argv){
 			case 'p':
 				_proxy_port = atoi(optarg);
 				if(!isdigit(optarg[0]) || _proxy_port<0){
-					printf(COL_RED "No valid argument given for -p option, set to default.\n" COL_RESET);
+					printf(COL_RED "No valid argument given for -p option, set to default."COL_RESET"\n");
 					_proxy_port = PROXY_DEFAULT_PORT;
 				}
 				break;
+      case 'q':
+        q = 0;
+        break;
 			default: // if ? encoutered, then there is an illegal opt
-				printf(COL_RED "This option (%s) isn't supported, please refer to the ptar manual with %s -h\n" COL_RESET,argv[optind-2],argv[0]);
+				printf(COL_RED "This option (%s) isn't supported, please refer to the ptar manual with %s -h"COL_RESET"\n",argv[optind-2],argv[0]);
 				exit(1); //Error
 		}
 	}
@@ -475,15 +472,15 @@ int main(int argc, char* const* argv){
   ////////////////////////////////////////////////////
   //Start server-browser socket and wait for clients//
   ////////////////////////////////////////////////////
-  printf (COL_YELLOW "\nStarting proxy...\n" COL_RESET);
+  if (q) printf (COL_YELLOW "\nStarting proxy..."COL_RESET"\n");
 
   int serverSocket ;
   struct sockaddr_in serv_addr;
 
   if ( (serverSocket=socket(PF_INET, SOCK_STREAM,0)) <0){
-    perror(COL_RED "Socket error"); exit(1) ;
+    if (q) perror(COL_RED "Socket error"); exit(1) ;
   }
-  printf (COL_GREEN "Socket OK\n" COL_RESET);
+  if (q) printf (COL_GREEN "Socket OK"COL_RESET"\n");
 
   /*
   * Lier l'adresse locale à la socket
@@ -496,34 +493,34 @@ int main(int argc, char* const* argv){
   setsockopt(serverSocket, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
   setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
   if (bind(serverSocket,(struct sockaddr *)&serv_addr, sizeof(serv_addr) ) <0) {
-    perror (COL_RED "Bind error");
+    if (q) perror (COL_RED "Bind error");
     exit (1);
   }
-  printf (COL_GREEN "Binding OK\n" COL_RESET);
+  if (q) printf (COL_GREEN "Binding OK"COL_RESET"\n");
 
   /* Paramétrer le nombre de
   connexion "pending" */
   if (listen(serverSocket, SOMAXCONN) <0) {
-    perror (COL_RED "Erreur listen\n");
+    if (q) perror (COL_RED "Erreur listen\n");
     exit (1);
   }
-  printf(COL_GREEN "Max connexion OK (%d)\n" COL_RESET, SOMAXCONN);
+  if (q) printf(COL_GREEN "Max connexion OK (%d)"COL_RESET"\n", SOMAXCONN);
 
 
   //Load filters
   int fsize = 0;
-  printf(COL_BLUE "Loading filters...\n" COL_RESET);
+  if (q) printf(COL_BLUE "Loading filters..."COL_RESET"\n");
 
   int arg_i;
   for(arg_i=optind; arg_i<argc; arg_i++){
     fsize += loadFilters(argv[arg_i]);
   }
 
-  printf(COL_GREEN "%d filters loaded\n" COL_RESET, fsize);
+  if (q) printf(COL_GREEN "%d filters loaded"COL_RESET"\n", fsize);
 
 
   //Start proxy
-  printf(COL_CYAN "\n|| Proxy started on port %i\n\n" COL_RESET, _proxy_port);
+  if (q) printf(COL_CYAN "\n|| Proxy started on port %i\n"COL_RESET"\n" , _proxy_port);
 
   /* Tout est ok */
   int dialogSocket;
@@ -537,7 +534,7 @@ int main(int argc, char* const* argv){
 
     dialogSocket = accept(serverSocket, (struct sockaddr *)&cli_addr, (socklen_t *)&clilen);
     if (dialogSocket < 0) {
-     perror(COL_RED "Fatal : Cannot accept this new client\n");
+     if (q) perror(COL_RED "Fatal : Cannot accept this new client\n");
      exit (1);
     }
 
