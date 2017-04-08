@@ -159,6 +159,7 @@ void fillHeader(struct header *hd, char *src_hd){
     char * currentOffset = src_hd;
     //get method (first thing)
     size = strchr(currentOffset,' ') - currentOffset;
+		memset(hd->method, 0, sizeof(hd->method));
     strncpy(hd->method, currentOffset, size);
     currentOffset += size + 1;
 
@@ -172,12 +173,14 @@ void fillHeader(struct header *hd, char *src_hd){
 
     //get path+port (in first line)
     size = strchr(currentOffset,' ') - currentOffset;
+		memset(hd->path, 0, 500* sizeof(char));
     strncpy(hd->path, currentOffset, size);
     currentOffset += size + 1;
 
 
     //Get protocol, last word of first line
     size = strchr(currentOffset,'\r') - currentOffset;
+		memset(hd->protocol, 0, 500*sizeof(char));
     strncpy(hd->protocol, currentOffset, size);
     currentOffset += size + 1;
 
@@ -197,6 +200,7 @@ void fillHeader(struct header *hd, char *src_hd){
     }else{//Port is defined
       hd->hst.port = atoi(portpos+1);
     }
+		memset(hd->hostname, 0, 500*sizeof(char));
     strncpy(hd->hostname, temp_hostport, portpos-temp_hostport);
 
     free(temp_hostport);
@@ -205,11 +209,14 @@ void fillHeader(struct header *hd, char *src_hd){
     struct addrinfo hints;
     struct addrinfo *result;
     memset(&hints, 0, sizeof(struct addrinfo));
+
     hints.ai_family = PF_UNSPEC;    /* Allow IPv4 or IPv6 */
     hints.ai_socktype = SOCK_STREAM; /* TCP for HTTP server */
     char sport[16];
     sprintf( sport, "%d", (int) hd->hst.port );
-    if(getaddrinfo(hd->hostname,sport, &hints, &result) != 0){
+		int test;
+    if((test = getaddrinfo(hd->hostname,sport, &hints, &result)) != 0){
+			printf("ERROR : getaddrinfo : %s\n", gai_strerror(test));
       //TODO Server not found
       exit(0);
     }
@@ -402,6 +409,7 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
   if(hd->ssl==1){
     httpsManager(dialogSocket, hd, respfd);
   }else{
+		printf("test\n");
     send(respfd, rcv_buffer, strlen(rcv_buffer), 0);
     httpManager(dialogSocket, hd, respfd);
   }
