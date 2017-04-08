@@ -28,7 +28,9 @@
 struct host {
   int port;
   char *sport;
-  struct addrinfo *addr;
+  int addr_family;
+  int addr_len;
+  struct sockaddr_in6 addr;
 };
 
 struct header {
@@ -121,15 +123,14 @@ void fillHeader(struct header *hd, char *src_hd){
       portpos = temp_hostport+strlen(temp_hostport);
 
       //Set default port
-      hd->hst.sport = "80"; //DEFAULT TODO : change depending on protocol and method !
+      hd->hst.port = 80; //DEFAULT TODO : change depending on protocol and method !
       if (hd->ssl){
-        hd->hst.sport= "443"; //DEFAULT SSL
+        hd->hst.port= 443; //DEFAULT SSL
       }
 
     }else{//Port is defined
-      hd->hst.sport = portpos+1;
+      hd->hst.port = atoi(portpos+1);
     }
-    hd->hst.port= atoi(hd->hst.sport); //int version
     strncpy(hd->hostname, temp_hostport, portpos-temp_hostport);
 
     free(temp_hostport);
@@ -138,14 +139,27 @@ void fillHeader(struct header *hd, char *src_hd){
     struct addrinfo hints;
     struct addrinfo *result;
     memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_family = PF_UNSPEC;    /* Allow IPv4 or IPv6 */
     hints.ai_socktype = SOCK_STREAM; /* TCP for HTTP server */
-    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-    hints.ai_protocol = 0;          /* Any protocol */
-    hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
-    hints.ai_next = NULL;
-    getaddrinfo(hd->hostname,hd->hst.sport, &hints, &hd->hst.addr);
+    char sport[16];
+    (void) sprintf( sport, "%d", (int) hd->hst.port );
+    if(getaddrinfo(hd->hostname,sport, &hints, &result) != 0){
+      //TODO Server not found
+      exit(0);
+    }
+
+    //Fill family and addr (priority to ipv4 because it works better)
+    struct addrinfo *res;
+    for(res=result;res!=NULL;res=res->ai_next){
+
+      hd->hst.addr_family = res->ai_family;
+      hd->hst.addr_len = res->ai_addrlen;
+      (void) memmove( &hd->hst.addr, res->ai_addr, hd->hst.addr_len );
+      if(res->ai_family==AF_INET){ //IPv4 so keep this !
+        break;
+      }
+
+    }
 
     //Show result
     //printf("\nHEADER :\n");
@@ -173,30 +187,12 @@ void repEolByEos(char* line){
 }
 int getRealServer(struct host *dst){
 
+  int sock = socket(dst->addr_family,SOCK_STREAM,0);
 
-  int sock = socket(AF_INET, SOCK_STREAM, 0);
-
-  int len=20;
-  char buffer[len];
-
-  struct addrinfo *addr = dst->addr;
-  while ( connect (sock, ((struct in_addr*)(addr->ai_addr)), sizeof(struct sockaddr) ) < 0){
-
-      if(addr->ai_addr->sa_family != AF_INET){
-        sock = socket(AF_INET6, SOCK_STREAM, 0);
-        if(connect (sock, ((struct sockaddr*)(addr->ai_addr)), sizeof(struct sockaddr) ) >=0){
-          break;//TODO invalid argument ? Why ?
-        }
-      }
-
-      addr = addr->ai_next;
-      if(addr==NULL){
-        perror("Erreur pas d'ip valide");
-        exit(0);
-        break;
-      }
+  if (connect(sock, (struct sockaddr*) &dst->addr, dst->addr_len) != 0){
+      perror("error connect\n");
+      exit(0);
   }
-
 
   return sock;
 
@@ -371,7 +367,7 @@ int main(int argc, const char* argv[]){
   * Lier l'adresse locale à la socket
   */
   memset (&serv_addr, 0, sizeof(serv_addr) );
-  serv_addr.sin_family = AF_INET ;
+  serv_addr.sin_family = PF_INET ;
   serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
   serv_addr.sin_port = htons(PROXY_PORT);
   int ttl = 1;
