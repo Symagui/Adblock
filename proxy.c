@@ -221,11 +221,10 @@ void fillHeader(struct header *hd, char *src_hd){
     hints.ai_socktype = SOCK_STREAM; /* TCP for HTTP server */
     char sport[16];
     sprintf( sport, "%d", (int) hd->hst.port );
-		int test;
-    if((test = getaddrinfo(hd->hostname,sport, &hints, &result)) != 0){
-			if (q) perror(("ERROR : getaddrinfo : %s\n", gai_strerror(test)));
-      //TODO Server not found
-      exit(0);
+	int addrinfo;
+    if((addrinfo = getaddrinfo(hd->hostname,sport, &hints, &result)) != 0){
+		perror("ERROR : getaddrinfo\n");
+    	exit(0);
     }
 
     //Fill family and addr (priority to ipv4 because it works better)
@@ -398,6 +397,12 @@ int ClientManager(int connectionNum, int dialogSocket, struct sockaddr_in cli_ad
 
   if (isAd(hd)){
     if (q) printf(">" COL_RED " (INVALID)" COL_RESET " %s\n", hd->path);
+	  
+  	if(hd->ssl==1){
+		const char *connection_established = "HTTP/1.0 200 Connection established\r\n\r\n";
+  		send(dialogSocket, connection_established, strlen(connection_established), 0);
+	}
+	  
     header_ok(dialogSocket);
     close(dialogSocket);
     return 0;

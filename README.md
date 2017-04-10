@@ -12,7 +12,14 @@ This proxy has been made by Romaric Mollard and Guillaume Ruchot in April 2017.
 
 Just *make* the sources then enter *./proxy -h*
 
-### help
+### Quick start
+
+To use the proxy and filter adverts (proxy on port 400) :
+```
+sudo ./proxy -p 400 mask.txt
+```
+
+### Help
 ```
 SYNOPSIS
 		(sudo) ./proxy [OPTION]... [FICHIER FILTRE, FICHIER FILTRE, ...]

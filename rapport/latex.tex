@@ -36,7 +36,7 @@ linktoc=page % only page is linked
 \renewcommand\contentsname{Sommaire}%
 }
 
-\def\nbpage{10}
+\def\nbpage{9}
 
 \def\code#1{\texttt{#1}}
 \let\tab\quad
@@ -162,7 +162,6 @@ Nous avons séparé la réalisation du projet en plusieurs étapes.
 Dans un premier temps, une grande partie du travail était la réalisation d'un proxy permettant l'accès à internet. Si ceci semble simple en apparence, c'est la partie la plus importante du travail dans ce projet. Internet évolue très rapidement et si nous développions un proxy limité à l'IPv4 et le protocole HTTP, nous ne pourrions pas afficher grand chose. Nous avons donc décidé de mettre en place notre proxy transparent en commencant de manière simple sur cette url :\\
 http://www.example.com/\\
 Son contenu est très court (tient en un seul paquet en temps normal), l'accès se fait via HTTP (pas de HTTPS) et enfin il n'y a pas de liens internes, c'est à dire que le navigateur ne va pas chercher d'autres liens pour charger des images par exemple ou des feuilles de style css.\\
-\\
 Afin d'étendre notre proxy à la réception de plusieurs paquets réponse et la connexion de clients multiples, nous avons utilisé un autre site web simple :\\
 http://cheval.fr/\\
 Celui-ci contient une image, qui ne tient pas en un seul paquet, ce qui permet de vérifier un autre point du proxy.
@@ -176,7 +175,7 @@ https://www.leboncoin.fr
 
 \subsection{Filtrage des URL}
 Nous effectuerons le filtrage des accès sur le second argument des entêtes HTTP, soit le chemin demandé. Il contient à quelques détails près l'url visible dans le navigateur.\\
-Le programme génèrera une LinkedList contenant l'intégralité des masques à utiliser. Lorsqu'une nouvelle url sera demandée, si l'un de ces masques est entièrement contenu dans cette url alors l'url est refusée.\\
+Le programme génèrera une LinkedList contenant l'intégralité des masques à utiliser. Lorsqu'une nouvelle url sera demandée, si l'un de ces masques est entièrement contenu dans cette url alors l'url est refusée.
 
 \subsection{Résumé}
 Voici un résumé graphique du fonctionnement du proxy MyAdBlock.
@@ -204,10 +203,12 @@ Tout d'abord, nous récupérons les options demandées par le client à l'aide d
 Pour le serveur et toutes les communications que nous faisons avec ce proxy, nous nous servons des socket tels que nous les avons vus en cours de RSA.\\
 Ainsi nous lions un socket d'écoute à un port (par default le port 80) sur lequel le navigateur du client pourra se connecter.\\
 Ensuite nous pouvons lancer la boucle principale d'écoute pour les clients. Celle-ci se chargera de récupérer toutes les requêtes arrivant depuis le port défini sur l'adresse localhost (127.0.0.1).\\
-Lorsqu'une requête arrive, on passe à l'étape suivante.
+Lorsqu'une requête arrive, le programme se dédouble grâce à la fonction \code{fork()} et nous passons à l'étape suivante.
+
 \subsection{Lecture du header}
 
 Pour simplifier les fonctions suivantes du programme, nous chargeons les différentes données disponibles dans une structure header dont le schéma est le suivant :\\
+\\
 \code{
   struct header {\\
   \tab  char ssl; //1 si c'est une connexion HTTPS\\
@@ -229,6 +230,7 @@ Pour commencer, les premières données se trouvent dans la première ligne de l
 \code{METHODE URLPATH PROTOCOLE},\\
 Par exemple :\\
 \code{GET https://www.wireshark.org/lists/ HTTP/1.1}\\
+\\
 Nous décomposons les différents morceaux de cette première ligne à l'aide de la fonction \code{strchr(2)} qui nous renvoie la position du prochain caractère demandé (ici espace).\\
 Ensuite, les autres données sont disponibles sous la forme :\\
 Clé: valeur\\
@@ -252,8 +254,8 @@ Une fois la communication terminée, nous fermons les sockets de dialogue avec l
 \subsection{Communication en SSL}
 
 La communication en SSL (https) est différente de la communication en http car elle assure que le transport des données est complètement confidentiel, et que l'on ne peut pas lire le contenu des paquet sur le chemin (comme nous le faisons pour la communication http).\\ Le fonctionnement général de SSL est le suivant : \\
-Deux hôtes qui veulent se connecter vont d'abord s'accorder sur les clés de sécurité, version, ... C'est ce qu'on appelle le "handshake". Ensuite ces deux hôtes communiquent de manière totalement cryptée, et enfin ils peuvent vérifier des informations sur la communication après coup.\\\\
-
+Deux hôtes qui veulent se connecter vont d'abord s'accorder sur les clés de sécurité, version, ... C'est ce qu'on appelle le "handshake". Ensuite ces deux hôtes communiquent de manière totalement cryptée, et enfin ils peuvent vérifier des informations sur la communication après coup.\\
+\\
 Ainsi, nous avions deux choix :\\
 - Le premier était de créer un véritable serveur acceptant les connexion SSL du client, récupérant ses requêtes, et les relayant au serveur externe en se connectant à lui en SSL. Mais cela aurait allongé considérablement le temps de dialogue et il nous aurait fallu obtenir une PKI.\\
 - La seconde, que nous avons choisi, était de simplement faire office de tunnel pour la connexion SSL. C'est à dire que lorsque nous recevons un message du client, nous l'envoyons immédiatement au serveur distant, et vice-versa. Le problème causé par cette solution est que nous ne pouvons pas toujours connaître la terminaison de la discussion entre le serveur et le client, ainsi nous avons mis en place un mécanisme de timeout qui rompt la connexion au bout de 4 secondes sans réponse. Ceci nous permet aussi d'éviter d'attendre trop longtemps la réponse d'un serveur qui ne serait pas fonctionnel.
@@ -261,7 +263,7 @@ Ainsi, nous avions deux choix :\\
 \subsection{Résultat}
 
 Comme nous pouvons le voir sur l'image suivante, nous filtrons avec succès la publicité présente sur le site leboncoin.fr.
-
+\\
 \begin{center}
   \includegraphics[height=7.5cm]{images/f4.png}
   \\
@@ -283,13 +285,14 @@ Nous avons donc édité le code pour envoyer chaque morceaux comme nous le faiso
 Dans un premier temps, nous avons utilisé \code{gethostbyname(1)} pour obtenir une adresse IPv4 correspondant à un nom de domaine. Cependant il fallait prendre en compte l'utilisation des adresses IPv6 qui commencent à être de plus en plus utilisées sur Internet.\\
 Pour celà nous avons utilisé \code{getaddrinfo(3)} qui prend en argument le nom de domaine et le port. La modification du code ne s'est pas faite facilement, et c'est en étudiant d'autres codes et comparant plusieurs documentations que nous avons compris que nous pouvions caster les structures prévues pour l'IPv4 et celles pour l'IPv6 afin de les rendre compréhensibles par la fonction \code{socket(4)}.
 
-\chapter{Conclusion}
-
 \section{Limites et améliorations du programme}
 Pour le moment le filtrage des url se fait après la recherche de l'adresse associée au nom de domaine, ce qui utilise légèrement le réseau alors que nous allons ignorer la réponse.\\
 \\
 Nous ne sommes pas capables d'éditer directement le code HTML retourné car il est souvent compressé ou crypté dans le cas d'une connexion HTTPS. Nous sommes alors très limité car nous utilisons seulement les données disponibles dans l'entête HTTP.\\
+\\
+Le programme utilise pour plus de simplicité la fonction \code{fork()}, ce qui à pour effet de dédoubler toutes les données. Nous n'avons pas besoin de toutes les dédoubler, il serait donc judicieux de modifier le programme pour le rendre fonctionnel avec des threads.\\
 
+\chapter{Conclusion}
 
 \section{Conclusion}
 Pour conclure, ce projet nous a permis de mieux comprendre les rouages des navigateurs d'un côté et des serveurs web de l'autre. Enfin nous prenons conscience de la précision nécessaire sur les données dans chaque protocole pour que toutes les transmissions soient correctes et complètes, ce qui nous semble de plus en plus classique pourtant avec notre utilisation importante d'Internet.
